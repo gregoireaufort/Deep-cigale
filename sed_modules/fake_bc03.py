@@ -27,7 +27,7 @@ class BC03(SedModule):
     component to the SED.
 
     """
-    wave =np.load('/home/aufort/Bureau/cigale-master/pcigale/data/wavelengths.npy')
+    wave =np.load('/home/aufort/Desktop/cigale-master/pcigale/data/wavelengths.npy')
     parameter_list = OrderedDict([
         ("imf", (
             "cigale_list(dtype=int, options=0. & 1.)",

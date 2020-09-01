@@ -15,8 +15,6 @@ Populations.
 from collections import OrderedDict
 
 import numpy as np
-import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import tensorflow as tf
 from pandas import read_csv, concat, DataFrame
 from sklearn.preprocessing import LabelEncoder
@@ -31,25 +29,21 @@ class BC03(SedModule):
     component to the SED.
 
     """
-    pcigale_path = '/home/aufort/Bureau/cigale-master/pcigale/'
-    params_path = '/home/aufort/Bureau/cigale-master/params_comparison.txt'
-    
-    wave =np.load(pcigale_path+'data/wavelengths.npy')
     model = tf.keras.models.load_model(
-            pcigale_path +'data/NN_lumins_bayes_2.h5')
+            '/home/aufort/Desktop/cigale-master/pcigale/data/ANN/NN_lumins_bayes_2.h5')
     scaling_params = np.load(
-            pcigale_path+'data/X_scaling_lumin.npy')
+            '/home/aufort/Desktop/cigale-master/pcigale/data/X_scaling_lumin.npy')
     mean_X, sd_X = scaling_params[:,0], scaling_params[:,1]
     scaling_spec = np.load(
-            pcigale_path+'data/Y_scaling_lumins.npy')
+            '/home/aufort/Desktop/cigale-master/pcigale/data/Y_scaling_lumins.npy')
     mean_Y, sd_Y, mins_Y = scaling_spec[:,0], scaling_spec[:,1], scaling_spec[:,2]
     
-    params = read_csv(params_path,sep=" ")
+    params = read_csv("/home/aufort/Desktop/cigale-master/params_comparison.txt",sep=" ")
     
     test_nn = params[params.columns[0:5]]
     
     labelencoder = LabelEncoder()
-    labelencoder.classes_ = np.load(pcigale_path+'data/classes_metallicity.npy')
+    labelencoder.classes_ = np.load('/home/aufort/Desktop/cigale-master/pcigale/data/classes_metallicity.npy')
     met_enc = labelencoder.transform(params['deep_bc03.metallicity'])
     mat_params = concat([test_nn,DataFrame(met_enc)], axis = 1).values
     
@@ -105,7 +99,7 @@ class BC03(SedModule):
 
         # We compute the Lyman continuum luminosity as it is important to
         # compute the energy absorbed by the dust before ionising gas.
-        wave = self.wave
+        wave =np.load('/home/aufort/Desktop/cigale-master/pcigale/data/wavelengths.npy')
 
         # We do similarly for the total stellar luminosity
         params_NN = [sed.info["sfh.tau_main"],sed.info["sfh.age_main"],sed.info["sfh.tau_burst"],sed.info["sfh.age_burst"],

@@ -1,5 +1,3 @@
-
-
 # -*- coding: utf-8 -*-
 # Copyright (C) 2014 University of Cambridge
 # Licensed under the CeCILL-v2 licence - see Licence_CeCILL_V2-en.txt
@@ -8,38 +6,11 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 import scipy.constants as cst
 
-from pcigale.data import Database, Deep_cloudy
+from pcigale.data import Database,deep_pyneb, deep_cloudy
 from . import SedModule
-# default_lines = ['Ly-alpha',
-#                  'CII-133.5',
-#                  'SiIV-139.7',
-#                  'CIV-154.9',
-#                  'HeII-164.0',
-#                  'OIII-166.5',
-#                  'CIII-190.9',
-#                  'CII-232.6',
-#                  'MgII-279.8',
-#                  'OII-372.7',
-#                  'H-10',
-#                  'H-9',
-#                  'NeIII-386.9',
-#                  'HeI-388.9',
-#                  'H-epsilon',
-#                  'SII-407.0',
-#                  'H-delta',
-#                  'H-gamma',
-#                  'H-beta',
-#                  'OIII-495.9',
-#                  'OIII-500.7',
-#                  'OI-630.0',
-#                  'NII-654.8',
-#                  'H-alpha',
-#                  'NII-658.4',
-#                  'SII-671.6',
-#                  'SII-673.1'
-#                  ]
 
 class NebularEmission(SedModule):
     """
@@ -55,14 +26,35 @@ class NebularEmission(SedModule):
     ionizing photons.
 
     """
-    params = read_csv("/home/aufort/Bureau/cigale-master/tests/deep/test_param_fake.txt",sep=" ")
-    params_cloudy = params[params.columns[7:12]]
-    lines = Deep_cloudy.Deep_cloudy(params_cloudy)
-    n = params_cloudy.shape[0]
+    params = pd.read_csv("/home/aufort/Desktop/cigale-master/params_comparison.txt",sep=" ")
+    names_deep_neb = ["deep_nebular.logU",
+                       "deep_nebular.geometrical_factor",
+                       "deep_nebular.Age",
+                       "deep_nebular.log_O_H",
+                       "deep_nebular.log_N_O",
+                       "deep_nebular.HbFrac"]
+    params_nebular = params[names_deep_neb]
+    all_lines = deep_cloudy.Deep_cloudy(params_nebular) /1e7 #Erg/S to W
+    n = params_nebular.shape[0]
+    pyneb = deep_pyneb.deep_continuum()
+    wavelength_cont = np.array([3500, 3600, 3700, 3800, 3900]) #To choose, not necessarily in a file
+    cont_unscaled = pyneb.compute_continuum(params_nebular,wavelength_cont)
+    #Need to scale cont by Hbeta in lines
+    cont = cont_unscaled.multiply(all_lines['H__1_486133A'],axis = 0)
+    del cont_unscaled
+    df_wavelength_lines =  pd.read_csv("/home/aufort/Desktop/cigale-master/pcigale/data/dict_wavelength_lines.csv") #depends on the Cloudy training set
+    
+    lines = all_lines[df_wavelength_lines['name']]
+    wavelength_lines = df_wavelength_lines['wavelength']/1000 # A to nm + fucked up reading
+    datadb_pyneb = dict()
     datadb_cloudy = dict()
     for i in range(n):
-        datadb_cloudy[tuple(np.around(params_cloudy[i,:],3))] = {'lines' : lines[i,:]}
-    del params
+        datadb_cloudy[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : lines.iloc[i,:],
+                                                                 'names' : lines.columns,
+                                                                 'wave' : wavelength_lines}
+        datadb_pyneb[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : cont.iloc[i,:],
+                                                                 'wave' : wavelength_cont/10}
+    
     
     parameter_list = OrderedDict([
         ('logU', (
@@ -80,12 +72,12 @@ class NebularEmission(SedModule):
             "Age",
             3.
         )),
-        ('12+log(O/H)',(
-            'cigale_list(minvalue = 6.6, maxvalue=9.4)',
-            "12+log(O/H)",
-            7.
+        ('log_O_H',(
+            'cigale_list(minvalue = -5.4, maxvalue=-2.8)',
+            "log(O/H)",
+            -3.
         )),
-        ('log(N/O)',(
+        ('log_N_O',(
             'cigale_list(minvalue = -2., maxvalue=0.)',
             "log(N/O)",
             -1.
@@ -124,8 +116,8 @@ class NebularEmission(SedModule):
         self.logU = float(self.parameters['logU'])
         self.geometrical_factor = float(self.parameters['geometrical_factor'])
         self.Age = float(self.parameters['Age'])
-        self.log_OH= float(self.parameters['12+log(O/H)'])
-        self.log_NO= float(self.parameters['log(N/O)'])
+        self.log_O_H= float(self.parameters['log_O_H'])
+        self.log_N_O= float(self.parameters['log_N_O'])
         self.HbFrac = float(self.parameters['HbFrac'])
         self.fesc = float(self.parameters['f_esc'])
         self.fdust = float(self.parameters['f_dust'])
@@ -143,43 +135,6 @@ class NebularEmission(SedModule):
             raise Exception("Escape fraction+f_dust>1")
 
         if self.emission:
-            params_NN = [self.logU,
-                         self.geometrical_factor,
-                         self.Age,
-                         self.log_OH,
-                         self.log_NO,
-                         self.HbFrac]
-            index = tuple(np.around(params_NN,2))
-            imported_lines = self.datadb[index]
-            
-            self.lines_template = imported_lines
-            with Database() as db:
-                metallicities = db.get_nebular_continuum_parameters()['metallicity']
-                self.cont_template = {m: db.get_nebular_continuum(m, self.logU)
-                                    for m in metallicities}
-
-            self.linesdict = dict(zip(self.lines_template[m].name,
-                                          zip(self.lines_template[m].wave,
-                                              self.lines_template[m].ratio)))
-
-            for lines in self.lines_template.values():
-                new_wave = np.array([])
-                for line_wave in lines.wave:
-                    width = line_wave * self.lines_width * 1e3 / cst.c
-                    new_wave = np.concatenate((new_wave,
-                                            np.linspace(line_wave - 3. * width,
-                                                        line_wave + 3. * width,
-                                                        9)))
-                new_wave.sort()
-                new_flux = np.zeros_like(new_wave)
-                for line_flux, line_wave in zip(lines.ratio, lines.wave):
-                    width = line_wave * self.lines_width * 1e3 / cst.c
-                    new_flux += (line_flux * np.exp(- 4. * np.log(2.) *
-                                (new_wave - line_wave) ** 2. / (width * width)) /
-                                (width * np.sqrt(np.pi / np.log(2.)) / 2.))
-                lines.wave = new_wave
-                lines.ratio = new_flux
-
             # To take into acount the escape fraction and the fraction of Lyman
             # continuum photons absorbed by dust we correct by a factor
             # k=(1-fesc-fdust)/(1+(α1/αβ)*(fesc+fdust))
@@ -228,30 +183,61 @@ class NebularEmission(SedModule):
         if self.emission:
             NLy_old = sed.info['stellar.n_ly_old']
             NLy_young = sed.info['stellar.n_ly_young']
-            NLy_tot = NLy_old + NLy_young
-            metallicity = sed.info['stellar.metallicity']
-            lines = self.lines_template[metallicity]
-            linesdict = self.linesdict[metallicity]
-            cont = self.cont_template[metallicity]
+            params_NN = [self.logU,
+                        self.geometrical_factor,
+                        self.Age,
+                        self.log_O_H,
+                        self.log_N_O,
+                        self.HbFrac]
+            index = tuple(np.around(params_NN,4))
+            
+            self.lines = self.datadb_cloudy[index]
+            cont= self.datadb_pyneb[index]
+
+            linesdict = dict(zip(self.lines["names"],
+                                          zip(self.lines["wave"],
+                                              self.lines["lumin"])))
 
             sed.add_info('nebular.lines_width', self.lines_width)
             sed.add_info('nebular.logU', self.logU)
+            sed.add_info('nebular.geometrical_factor', self.geometrical_factor)
+            sed.add_info('nebular.Age', self.Age)
+            sed.add_info('nebular.log_O_H', self.log_O_H)
+            sed.add_info('nebular.log_N_O', self.log_N_O)
+            sed.add_info('nebular.HbFrac', self.HbFrac)
+            
+            new_wave = np.array([])
+            for line_wave in self.lines["wave"]:
+                width = line_wave * self.lines_width * 1e3 / cst.c
+                new_wave = np.concatenate((new_wave,
+                                        np.linspace(line_wave - 3. * width,
+                                                    line_wave + 3. * width,
+                                                    9)))
+            new_wave.sort()
+            new_flux = np.zeros_like(new_wave)
+            for line_flux, line_wave in zip(self.lines["lumin"],self.lines["wave"]):
+                width = line_wave * self.lines_width * 1e3 / cst.c
+                new_flux += (line_flux * np.exp(- 4. * np.log(2.) *
+                            (new_wave - line_wave) ** 2. / (width * width)) /
+                            (width * np.sqrt(np.pi / np.log(2.)) / 2.))
+            self.lines["wave"] = new_wave
+            self.lines["lumin"] = new_flux
 
-            for line in default_lines:
-                wave, ratio = linesdict[line]
+            for line in self.lines["names"]:
+                wave, lumin = linesdict[line]
                 sed.lines[line] = (wave,
-                                   ratio * NLy_old * self.corr,
-                                   ratio * NLy_young * self.corr)
+                                   lumin * NLy_old * self.corr,
+                                   lumin * NLy_young * self.corr)
 
-            sed.add_contribution('nebular.lines_old', lines.wave,
-                                 lines.ratio * NLy_old * self.corr)
-            sed.add_contribution('nebular.lines_young', lines.wave,
-                                 lines.ratio * NLy_young * self.corr)
+            sed.add_contribution('nebular.lines_old', self.lines["wave"],
+                                 self.lines["lumin"] * NLy_old * self.corr)
+            sed.add_contribution('nebular.lines_young', self.lines["wave"],
+                                 self.lines["lumin"] * NLy_young * self.corr)
 
-            sed.add_contribution('nebular.continuum_old', cont.wave,
-                                 cont.lumin * NLy_old * self.corr)
-            sed.add_contribution('nebular.continuum_young', cont.wave,
-                                 cont.lumin * NLy_young * self.corr)
+            sed.add_contribution('nebular.continuum_old', cont["wave"],
+                                 cont["lumin"] * NLy_old * self.corr)
+            sed.add_contribution('nebular.continuum_young', cont["wave"],
+                                 cont["lumin"] * NLy_young * self.corr)
 
 
 # SedModule to be returned by get_module
