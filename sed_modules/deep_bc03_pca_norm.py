@@ -33,38 +33,37 @@ class BC03(SedModule):
     component to the SED.
 
     """
-    model = tf.keras.models.load_model(
-            '/home/aufort/Desktop/cigale-master/pcigale/data/ANN/NN_pca_norm.h5')
-    scaling_params = np.load(
-            '/home/aufort/Desktop/cigale-master/pcigale/data/X_scaling_lumin.npy')
+    params = read_csv("/home/aufort/Desktop/cigale-master/params_comparison.txt",sep=" ")
+    path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
+    model = tf.keras.models.load_model(path_data+'ANN/NN_pca_norm.h5')
+    scaling_params = np.load( path_data+'X_scaling_lumin.npy')
     mean_X, sd_X = scaling_params[:,0], scaling_params[:,1]
-    scaling_spec = np.load(
-            '/home/aufort/Desktop/cigale-master/pcigale/data/Y_scaling_lumins.npy')
+    scaling_spec = np.load( path_data+'Y_scaling_lumins.npy')
     mean_Y, sd_Y, mins_Y = scaling_spec[:,0], scaling_spec[:,1], scaling_spec[:,2]
-    pca_fit = load('/home/aufort/Desktop/cigale-master/pcigale/data/pca_fit_norm.joblib') 
-    test = read_csv("/home/aufort/Desktop/cigale-master/params_comparison.txt",sep=" ")
+    pca_fit = load( path_data+'pca_fit_norm.joblib') 
     
-    test_nn = test[test.columns[0:5]]
+    
+    test_nn = params[params.columns[0:5]]
     
     
     labelencoder = LabelEncoder()
-    labelencoder.classes_ = np.load('/home/aufort/Desktop/cigale-master/pcigale/data/classes_metallicity.npy')
-    met_enc = labelencoder.transform(test['deep_bc03.metallicity'])
-    mat_params = concat([test_nn,test['deep_bc03.metallicity']], axis = 1).values
+    labelencoder.classes_ = np.load(path_data +'classes_metallicity.npy')
+    met_enc = labelencoder.transform(params['deep_bc03.metallicity'])
+    mat_params = concat([test_nn,params['deep_bc03.metallicity']], axis = 1).values
     
     param_norm = (mat_params-mean_X)/sd_X
     pred_NN = model.predict(param_norm)
     pred_NN_inv = pca_fit.inverse_transform(pred_NN)
     rescaled = np.exp(((pred_NN_inv)*sd_Y) + mean_Y)
     n = mat_params.shape[0]
-    mat_params[:,5] = test['deep_bc03.metallicity']
+    mat_params[:,5] = params['deep_bc03.metallicity']
     datadb = dict()
     for i in range(n):
         datadb[tuple(np.around(mat_params[i,:],2))] = {'spec_young' : rescaled[i,0:6941],
     						  'spec_old' : rescaled[i,6941:13882],
     						  'n_ly' : rescaled[i,-1] }
         
-    del test, test_nn, scaling_spec, mat_params, pred_NN
+    del params, test_nn, scaling_spec, mat_params, pred_NN
     parameter_list = OrderedDict([
         ("imf", (
             "cigale_list(dtype=int, options=0. & 1.)",
@@ -105,7 +104,7 @@ class BC03(SedModule):
 
         # We compute the Lyman continuum luminosity as it is important to
         # compute the energy absorbed by the dust before ionising gas.
-        wave =np.load('/home/aufort/Desktop/cigale-master/pcigale/data/wavelengths.npy')
+        wave =np.load(self.path_data+'wavelengths.npy')
 
         # We do similarly for the total stellar luminosity
         params_NN = [sed.info["sfh.tau_main"],sed.info["sfh.age_main"],sed.info["sfh.tau_burst"],sed.info["sfh.age_burst"],

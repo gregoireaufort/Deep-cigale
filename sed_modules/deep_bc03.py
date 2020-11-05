@@ -13,7 +13,7 @@ Populations.
 """
 
 from collections import OrderedDict
-
+import os
 import numpy as np
 import tensorflow as tf
 from pandas import read_csv, concat, DataFrame
@@ -29,21 +29,19 @@ class BC03(SedModule):
     component to the SED.
 
     """
-    model = tf.keras.models.load_model(
-            '/home/aufort/Desktop/cigale-master/pcigale/data/ANN/NN_lumins_bayes_2.h5')
-    scaling_params = np.load(
-            '/home/aufort/Desktop/cigale-master/pcigale/data/X_scaling_lumin.npy')
-    mean_X, sd_X = scaling_params[:,0], scaling_params[:,1]
-    scaling_spec = np.load(
-            '/home/aufort/Desktop/cigale-master/pcigale/data/Y_scaling_lumins.npy')
-    mean_Y, sd_Y, mins_Y = scaling_spec[:,0], scaling_spec[:,1], scaling_spec[:,2]
     
     params = read_csv("/home/aufort/Desktop/cigale-master/params_comparison.txt",sep=" ")
+    path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
+    model = tf.keras.models.load_model(path_data+'ANN/NN_lumins_bayes_2.h5')
+    scaling_params = np.load(path_data +'X_scaling_lumin.npy')
+    mean_X, sd_X = scaling_params[:,0], scaling_params[:,1]
+    scaling_spec = np.load(path_data+'Y_scaling_lumins.npy')
+    mean_Y, sd_Y, mins_Y = scaling_spec[:,0], scaling_spec[:,1], scaling_spec[:,2]
     
     test_nn = params[params.columns[0:5]]
     
     labelencoder = LabelEncoder()
-    labelencoder.classes_ = np.load('/home/aufort/Desktop/cigale-master/pcigale/data/classes_metallicity.npy')
+    labelencoder.classes_ = np.load(path_data + 'classes_metallicity.npy')
     met_enc = labelencoder.transform(params['deep_bc03.metallicity'])
     mat_params = concat([test_nn,DataFrame(met_enc)], axis = 1).values
     
@@ -99,7 +97,7 @@ class BC03(SedModule):
 
         # We compute the Lyman continuum luminosity as it is important to
         # compute the energy absorbed by the dust before ionising gas.
-        wave =np.load('/home/aufort/Desktop/cigale-master/pcigale/data/wavelengths.npy')
+        wave =np.load(self.path_data +'wavelengths.npy')
 
         # We do similarly for the total stellar luminosity
         params_NN = [sed.info["sfh.tau_main"],sed.info["sfh.age_main"],sed.info["sfh.tau_burst"],sed.info["sfh.age_burst"],

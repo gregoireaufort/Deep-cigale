@@ -2,14 +2,14 @@
 # Copyright (C) 2014 University of Cambridge
 # Licensed under the CeCILL-v2 licence - see Licence_CeCILL_V2-en.txt
 #Author: Grégoire Aufort
+import os
 from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 import scipy.constants as cst
 
-from pcigale.data import Database,deep_pyneb, deep_cloudy
+from pcigale.data import deep_pyneb, deep_cloudy
 from . import SedModule
 
 class NebularEmission(SedModule):
@@ -26,7 +26,7 @@ class NebularEmission(SedModule):
     ionizing photons.
 
     """
-    params = pd.read_csv("/home/aufort/Desktop/cigale-master/params_comparison.txt",sep=" ")
+    params = pd.read_csv("/home/aufort/Desktop/cigale-master/params_nebular.txt",sep=" ")
     names_deep_neb = ["deep_nebular.logU",
                        "deep_nebular.geometrical_factor",
                        "deep_nebular.Age",
@@ -37,15 +37,16 @@ class NebularEmission(SedModule):
     all_lines = deep_cloudy.Deep_cloudy(params_nebular) /1e7 #Erg/S to W
     n = params_nebular.shape[0]
     pyneb = deep_pyneb.deep_continuum()
-    wavelength_cont = np.array([3500, 3600, 3700, 3800, 3900]) #To choose, not necessarily in a file
+    wavelength_cont = np.array([3500, 3600, 3700, 3800, 3900]) #To choose, not necessarily in a file, in Angstrom, cf PyNeb doc
     cont_unscaled = pyneb.compute_continuum(params_nebular,wavelength_cont)
     #Need to scale cont by Hbeta in lines
     cont = cont_unscaled.multiply(all_lines['H__1_486133A'],axis = 0)
     del cont_unscaled
-    df_wavelength_lines =  pd.read_csv("/home/aufort/Desktop/cigale-master/pcigale/data/dict_wavelength_lines.csv") #depends on the Cloudy training set
+    path_wave = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/data/dict_wavelength_lines.csv'
+    df_wavelength_lines =  pd.read_csv(path_wave) #depends on the Cloudy training set
     
     lines = all_lines[df_wavelength_lines['name']]
-    wavelength_lines = df_wavelength_lines['wavelength']/1000 # A to nm + fucked up reading
+    wavelength_lines = df_wavelength_lines['wavelength']/1000 # A to nm +  reading error when making dict_wavelength_lines
     datadb_pyneb = dict()
     datadb_cloudy = dict()
     for i in range(n):
