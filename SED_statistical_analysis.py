@@ -40,15 +40,17 @@ def extract_lines(gal,wave,spec):
 
     Parameters
     ----------
-    gal : TYPE
-        DESCRIPTION.
-    spectre : TYPE
-        DESCRIPTION.
+    gal : galaxy
+        CIGALE galaxy object
+    spectre : array like
+        observed spectrum
 
     Returns
     -------
-    list
-        DESCRIPTION.
+    tuple
+        integrated_lines : emission lines
+        continuum : spectrum without the emission lines
+        new_wave : wavelength of the spectrum without emission lines
 
     """
     width = gal.info["nebular.lines_width"]
@@ -241,7 +243,10 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
 def lim_target_spectro(observed_galaxy,CIGALE_parameters):
     wave =observed_galaxy["spectroscopy_wavelength"]
     spectrum = observed_galaxy["spectroscopy_fluxes"]
-    lim_wave, lim_spec = limit_spec(wave,spectrum,CIGALE_parameters['wavelength_limits']["min"],CIGALE_parameters['wavelength_limits']["max"])
+    lim_wave, lim_spec = limit_spec(wave,
+                                    spectrum,
+                                    CIGALE_parameters['wavelength_limits']["min"],
+                                    CIGALE_parameters['wavelength_limits']["max"])
     _,binned_spec = binning_flux(lim_wave,lim_spec,CIGALE_parameters['n_bins'])
     return binned_spec
 
@@ -409,6 +414,8 @@ def plot_result(CIGALE_parameters):
                      ax = axes[i//n_cols,i%n_cols])
                      #discrete = True)
         #plt.show()
+        
+        
 def analyse_results(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
     to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
@@ -418,7 +425,7 @@ def analyse_results(CIGALE_parameters):
         res[col]  = {"mean":weighted_stats.mean,
                      "var":weighted_stats.var,
                      "sd" :weighted_stats.std,
-                     "95% credible interval":np.array(weighted_stats.quantile([0.05,0.95])),
-                     "max":"later",
+                     #"95% credible interval":np.array(weighted_stats.quantile([0.05,0.95])),
+                     "max":"later : to be added to TAMIS",
                      }
     return res
