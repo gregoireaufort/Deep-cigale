@@ -20,8 +20,8 @@ np.random.seed(42)
 
 
 
-galaxy_obs = SED_statistical_analysis.read_galaxy_fits("/home/aufort/Desktop/jorge/observations.fits", 
-                 "/home/aufort/Desktop/jorge/COSMOS_field_cont_lines/222172_best_model.fits",
+galaxy_obs = SED_statistical_analysis.read_galaxy_fits("observations.fits", 
+                 "222172_best_model.fits",
                  ident = 222172)
 
 
@@ -104,6 +104,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
                     "bands" :bands,
+                    "mode" : ["photo", "spectro"],
                     "n_jobs" : 4}
 
 dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
