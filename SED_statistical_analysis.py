@@ -8,6 +8,7 @@ Created on Thu Jan 21 12:26:01 2021
 
 from  TAMIS import TAMIS
 import seaborn as sns
+from astropy.table import Table
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
@@ -88,17 +89,17 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     width = CIGALE_parameters["nebular"]["lines_width"]
     wave = observed_galaxy["spectroscopy_wavelength"]
     err = observed_galaxy["spectroscopy_err"]**2
-    # limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
-    # lines = [limit_spec(wave,err,limit[0],limit[1]) for limit in limits]
-    # wave_to_remove = np.array(list(chain(*[line[0] for line in lines])))
-    # err_to_remove = err[np.in1d(wave, wave_to_remove)]
-    # covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
-    # continuum =  np.setdiff1d(err,err_to_remove)
-    # new_wave = np.setdiff1d(wave,wave_to_remove)
+    if "lines" in CIGALE_parameters["mode"]:
+        limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
+        lines = [limit_spec(wave,err,limit[0],limit[1]) for limit in limits]
+        wave_to_remove = np.array(list(chain(*[line[0] for line in lines])))
+        err_to_remove = err[np.in1d(wave, wave_to_remove)]
+        covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
+        continuum =  np.setdiff1d(err,err_to_remove)
+        new_wave = np.setdiff1d(wave,wave_to_remove)
     
     _,covar_continuum = binning_variances(wave,err, CIGALE_parameters["n_bins"])
-    # return covar_lines, covar_continuum
-    return covar_continuum
+    return np.diag(covar_lines), np.diag(covar_continuum)
 
 def var_trapz(var,wave):
     seq_diff = (wave[1:] -wave[:-1])**2 #consecutive differences for the step
@@ -175,24 +176,41 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
     
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
     photo = np.array([SED.compute_fnu(band) for band in CIGALE_parameters['bands']])
-    wavelength,spectrum = SED.wavelength_grid, SED.fnu
-    lim_wave, lim_spec = limit_spec(wavelength,spectrum,CIGALE_parameters['wavelength_limits']["min"],CIGALE_parameters['wavelength_limits']["max"])
-    #lines, lim_spec, lim_wave  = extract_lines(SED,wave,spec)
-    _,spectro = binning_flux(lim_wave,lim_spec,CIGALE_parameters['n_bins'])
-    
-    return  photo,np.array(spectro) #, lines
+    if "spectro" in CIGALE_parameters["mode"]:
+        wavelength,spectrum = SED.wavelength_grid, SED.fnu
+        lim_wave, lim_spec = limit_spec(wavelength,
+                                        spectrum,
+                                        CIGALE_parameters['wavelength_limits']["min"],
+                                        CIGALE_parameters['wavelength_limits']["max"])
+        lines, lim_spec, lim_wave  = extract_lines(SED,wavelength,spectrum)
+        _,spectro = binning_flux(lim_wave,lim_spec,CIGALE_parameters['n_bins'])
+    else:
+        spectro, lines = None, None
+    return  photo,np.array(spectro), lines
     
 def scale_factor_pre_computation(target_photo,
                                  cov_photo,
                                  target_spectro,
-                                 cov_spectro):
+                                 cov_spectro,
+                                 mode):
     """Pre-computes parts of the numerator of the max-likelihood estimator of 
         alpha
     """
-    inv_cov_spectro = np.linalg.pinv(cov_spectro)
-    inv_cov_photo = np.linalg.pinv(cov_photo)
-    half_num_constant_spectro = target_spectro @ inv_cov_spectro
-    half_num_constant_photo = target_photo @ inv_cov_photo
+    if "spectro" in mode and "photo" in mode : 
+        inv_cov_spectro = np.linalg.pinv(cov_spectro)
+        inv_cov_photo = np.linalg.pinv(cov_photo)
+        half_num_constant_spectro = target_spectro @ inv_cov_spectro
+        half_num_constant_photo = target_photo @ inv_cov_photo
+    elif "spectro" in mode and not "photo" in mode:
+        inv_cov_spectro = np.linalg.pinv(cov_spectro)
+        half_num_constant_spectro = target_spectro @ inv_cov_spectro
+        half_num_constant_photo = None
+        inv_cov_photo = None
+    elif (not "spectro" in mode) and "photo" in mode:
+        inv_cov_spectro = None
+        inv_cov_photo = np.linalg.pinv(cov_photo)
+        half_num_constant_spectro = None
+        half_num_constant_photo = target_photo @ inv_cov_photo
     return inv_cov_spectro, inv_cov_photo, half_num_constant_spectro,  half_num_constant_photo
 
 
@@ -224,21 +242,24 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         SED = cigale(input_cigale,CIGALE_parameters,warehouse)
         SED_photo = SED[0]
         SED_spectro = SED[1]
-        #SED_lines = SED[2]
+        SED_lines = SED[2]
         constant = compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
         scaled_photo = constant*SED_photo
         scaled_spectro = constant*SED_spectro
-        #scaled_lines.append(constant*SED_lines)
-        return scaled_photo,scaled_spectro#, scaled_lines
+        scaled_lines = constant*SED_lines
+        
+        return scaled_photo,scaled_spectro, scaled_lines
     with mp.Pool(processes=n_jobs) as pool:
         computed = pool.map(_compute_scaled_SED, cigale_input)
-    # computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale
+    #computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale
     #                                                                   ) for input_cigale in cigale_input)
-    #computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
+    # computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
     scaled_photo = [res[0] for res in computed]
     scaled_spectro = [res[1] for res in computed]
-    #scaled_lines = [res[2] for res in computed]
-    return scaled_photo,scaled_spectro#, scaled_lines
+    scaled_lines = [res[2] for res in computed]
+    return scaled_photo,scaled_spectro, scaled_lines
+
+
 
 def lim_target_spectro(observed_galaxy,CIGALE_parameters):
     wave =observed_galaxy["spectroscopy_wavelength"]
@@ -249,6 +270,8 @@ def lim_target_spectro(observed_galaxy,CIGALE_parameters):
                                     CIGALE_parameters['wavelength_limits']["max"])
     _,binned_spec = binning_flux(lim_wave,lim_spec,CIGALE_parameters['n_bins'])
     return binned_spec
+
+
 
 
 class target_SED(object):
@@ -262,16 +285,25 @@ class target_SED(object):
                  dim_prior,
                  weight_spectro = 1):
         self.dim = dim_prior
-        self.target_photo = observed_galaxy["photometry_fluxes"]
-        self.target_spectro = lim_target_spectro(observed_galaxy,CIGALE_parameters)
-        self.covar_photo = np.diag(observed_galaxy["photometry_err"]**2)
-        #self.covar_lines,self.covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
-        self.covar_spectro =  np.diag(compute_covar_spectro(observed_galaxy, CIGALE_parameters))
-    
+        if  observed_galaxy["photometry_fluxes"] is not None and "photo" in CIGALE_parameters["mode"]:
+            self.target_photo = observed_galaxy["photometry_fluxes"]
+            self.covar_photo = np.diag(observed_galaxy["photometry_err"]**2)
+        else :
+            self.target_photo,self.covar_photo = None, None
+        
+        if observed_galaxy["spectroscopy_fluxes"]  is not None and "spectro" in CIGALE_parameters["mode"]:
+            self.target_spectro = lim_target_spectro(observed_galaxy,
+                                                     CIGALE_parameters)
+            # self.target_lines = extract_lines(gal,wave,spec) # rewrite
+            self.covar_lines,self.covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
+        else : 
+            self.target_spectro, self.covar_spectro = None, None
+            
         self.pre_computed_constants =scale_factor_pre_computation(self.target_photo ,
                                                                   self.covar_photo,
                                                                   self.target_spectro,
-                                                                  self.covar_spectro)
+                                                                  self.covar_spectro,
+                                                                  CIGALE_parameters["mode"])
         self.weight_spectro = weight_spectro
         self.warehouse = warehouse
         self.CIGALE_parameters = CIGALE_parameters
@@ -283,34 +315,39 @@ class target_SED(object):
         target_spectro = self.target_spectro
         covar_photo = self.covar_photo
         covar_spectro = self.covar_spectro
-        #covar_lines = self.covar_lines
+        covar_lines = self.covar_lines
         constants = self.pre_computed_constants
         CIGALE_parameters = self.CIGALE_parameters
         warehouse = self.warehouse
-        # scaled_SED_photo,scaled_SED_spectro,scaled_SED_lines = compute_scaled_SED(sample,
-        #                                                          constants,
-        #                                                          weight_spectro,
-        #                                                          CIGALE_parameters,
-        #                                                          warehouse)
-        scaled_SED_photo,scaled_SED_spectro= compute_scaled_SED(sample,
+        scaled_SED_photo,scaled_SED_spectro,scaled_SED_lines= compute_scaled_SED(sample,
                                                                  constants,
                                                                  weight_spectro,
                                                                  CIGALE_parameters,
                                                                  warehouse)
         #We switch mean and x for vectorization
-        log_likelihood_photo = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_photo,
-                                                                         mean = target_photo,
-                                                                         cov = covar_photo,
-                                                                         allow_singular = True))
-        log_likelihood_spectro = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_spectro,
-                                                                           mean = target_spectro,
-                                                                           cov = covar_spectro,
-                                                                           allow_singular = True))
-        # log_likelihood_lines = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_lines,
-        #                                                                    mean = target_lines,
-        #                                                                    cov = covar_lines,
-        #                                                                    allow_singular = True))
-        total_loglike = weight_spectro*log_likelihood_spectro + log_likelihood_photo #+ log_likelihood_lines 
+        if target_photo:
+            log_likelihood_photo = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_photo,
+                                                                             mean = target_photo,
+                                                                             cov = covar_photo,
+                                                                             allow_singular = True))
+        else : 
+            log_likelihood_photo = 0
+        if target_spectro :
+            log_likelihood_spectro = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_spectro,
+                                                                               mean = target_spectro,
+                                                                               cov = covar_spectro,
+                                                                               allow_singular = True))
+        else : 
+            log_likelihood_spectro = 0
+            
+        if target_lines : 
+            log_likelihood_lines = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_lines,
+                                                                                mean = target_lines,
+                                                                                cov = covar_lines,
+                                                                                allow_singular = True))
+        else : 
+            log_likelihood_lines = 0
+        total_loglike = weight_spectro*log_likelihood_spectro + log_likelihood_photo + log_likelihood_lines 
         
         return total_loglike
     
@@ -354,9 +391,8 @@ def fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters):
                    n_sample = TAMIS_parameters['n_sample'],
                    alpha = TAMIS_parameters['alpha'])
     result = Sampler.result(T = TAMIS_parameters['T_max'])
-    analyse_results(CIGALE_parameters)
     create_output_files(CIGALE_parameters, result)
-    
+    analyse_results(CIGALE_parameters)
     
     return result
 
@@ -374,6 +410,36 @@ def read_galaxy(file_photo, file_spectro):
                         
     return observed_galaxy
 
+def read_galaxy_fits(photo_file,spectro_file,ident = None):
+    #to rewrite with bands in database
+    table = Table.read(photo_file)
+    table = table.to_pandas()
+    if ident :
+        photo = table[list(table.columns[4:32])][table['id'] == ident]
+    else :
+        photo = table[list(table.columns[4:32])][0]
+    bands = []
+    err = []
+    for band in photo.columns:
+        if band.endswith('_err'):
+            err.append(band)
+        else:
+            bands.append(band)
+    photo_flux = np.array(photo[bands]).reshape(len(bands),)
+    photo_err = np.array(photo[err]).reshape(len(err),)
+    
+    spectro = Table.read(spectro_file)
+    spectro_flux = np.array(spectro["Fnu"])
+    spectro_err = np.array(0.1*spectro_flux)
+    spectro_wavelength = np.array(spectro["wavelength"])
+    observed_galaxy  = {"spectroscopy_wavelength":spectro_wavelength,
+                        "spectroscopy_fluxes":spectro_flux,
+                        "spectroscopy_err" : spectro_err,
+                        "photometry_fluxes" : photo_flux,
+                        "photometry_err" :photo_err,
+                        "bands" : bands
+                        }
+    return observed_galaxy
 def split_name_params(columns):
     new_columns = []
     for col in columns:
