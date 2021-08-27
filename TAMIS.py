@@ -9,19 +9,47 @@ Created on Sat Nov 28 16:53:30 2020
 import types
 import numpy as np
 import time
-
+from utils import compute_ESS,compute_KL, compute_perplexity
 import scipy.stats as stats
-from GMM import GMM_fit
+from GMM import GMM_fit, Mixture_gaussian
 import matplotlib.pyplot as plt
+from celluloid import Camera
 import seaborn as sns
 from sklearn.utils import resample
 import pandas as pd
 import copy
-from scipy.interpolate import griddata
-from scipy.special import xlogy
-from utils import gauss, plot_contour
-from scipy.optimize import bisect, minimize_scalar, minimize,NonlinearConstraint
+from scipy.optimize import bisect
+from scipy.special import logsumexp
 
+
+
+def plot_convergence_2(TAMIS, iters = None, lim = 50, target_plot = None, title =None):
+    camera = Camera(plt.figure())
+    if not iters:
+        iters= range(TAMIS.iteration)
+    if not title:
+        title = "test.gif"
+    for iteration in iters:
+        means = TAMIS.theta_total[iteration].mean
+        covariances = TAMIS.theta_total[iteration].variance
+        weights_prop = TAMIS.theta_total[iteration].proportions
+        dots = Mixture_gaussian.rvs(size = 100, 
+                             means = means,
+                             covs = covariances,
+                             weights = weights_prop)
+        # plt.figure()
+        if target_plot:
+            target_plot()
+        plt.scatter(dots[:,0], dots[:,1], s= 1, color = "blue")
+        camera.snap()
+        plt.xlim([-lim,lim])
+        plt.ylim([-lim,lim])
+        # plt.title(str(iteration))
+        # plt.show()
+        anim = camera.animate(blit=True)
+        anim.save(title)
+            
+            
 def adapt_beta(weights, alpha):
         """
         Adapt beta by binary search to get a tempered ESS of alpha
@@ -29,9 +57,9 @@ def adapt_beta(weights, alpha):
         
         def ESS_beta(beta):
             temp_weights = np.exp(beta * weights)
-            num = np.sum(temp_weights)**2
-            denom = np.sum(temp_weights**2)
-            return (num/denom) 
+            ESS= compute_ESS(temp_weights)
+            return ESS
+        
         def ESS_to_solve(beta):
             return ESS_beta(beta) - alpha
        
@@ -51,7 +79,13 @@ class TAMIS(object):
                  n_sample=10000,
                  ESS_tol = 1000,
                  alpha = 500,
+                 tau = 0.6,
+                 EM_solver = "sklearn",
+                 integer_weights = False,
                  adapt = True,
+                 betas = None,
+                 recycle= True,
+                 recycling_iters = None,
                  verbose= 0):
         """
         Pass initializing data to importance sampler.
@@ -82,6 +116,12 @@ class TAMIS(object):
         self.adapt = adapt
         self.total_weight = []
         self.KL = []
+        self.EM_solver = EM_solver
+        self.tau = tau
+        self.integer_weights = integer_weights
+        self.recycle = recycle
+        self.recycling_iters = recycling_iters
+        self.path_betas = betas
         if proposal is None:
             self.proposal = stats.multivariate_normal
             self.p=0
@@ -145,11 +185,13 @@ class TAMIS(object):
         # plt.show()
         self.total_weight.append(self.weights)
 
-        ESS = 1/np.sum(self.weights**2)
+        ESS = compute_ESS(self.weights)
         self.ESS.append(ESS)
-        if ESS <self.alpha and self.adapt:
+        if ESS <self.alpha and self.adapt and (self.path_betas is None):
             beta = adapt_beta(log_weight,
                                 alpha = self.alpha)
+        elif (self.path_betas is not None):
+            beta = self.path_betas[self.iteration]
         else :
             beta = 1        
             
@@ -171,10 +213,11 @@ class TAMIS(object):
         self.betas.append(beta)
         self.total_target.append(np.vstack(targ_sample))
         
-        tempered_ESS = 1/np.sum(self.tempered_weights**2)
-        KL= np.sum(xlogy(self.weights,self.weights)) + np.log(len(self.weights))
+        tempered_ESS = compute_ESS(self.tempered_weights)
+        KL= compute_KL(self.weights)
         self.tempered_ESS.append(tempered_ESS)
         self.KL.append(KL)
+        
     def test_stop(self):
         """
         test ESS or KL
@@ -182,8 +225,10 @@ class TAMIS(object):
     
         if self.verbose == 1:
             #print("tempered ESS = ",tempered_ESS)
+            print("Iteration" , self.iteration)
             print("ESS = ",self.ESS[self.iteration])
             print("Kullback-Leibler divergence = ", self.KL[self.iteration] )
+            print("perplexity = ",compute_perplexity(self.weights))
             
         return np.sum(self.ESS)>self.ESS_tol
     
@@ -207,7 +252,10 @@ class TAMIS(object):
             temp = GMM_fit(sample = self.sample,
                            weights= weights,
                            n_comp = self.n_comp,
-                           init_parameters = theta)
+                           tau =self.tau,
+                           init_parameters = theta,
+                           EM_solver = self.EM_solver,
+                           integer_weights=self.integer_weights)
             #assert np.isnan(temp.mean[0][0]) == False
             theta.mean=temp.mean
             theta.variance=temp.variance
@@ -229,22 +277,52 @@ class TAMIS(object):
         """
         recycling step
         """
-        t1=time.time()
-        T =len(self.total_sample)
-        self.total_sample=np.row_stack(
-                [self.total_sample[i] for i in range(T)])
-        self.total_target=np.row_stack(
-                [self.total_target[i] for i in range(T)])
-        N_total = np.sum(self.n_sample[0:T])
-        t2=time.time()
-        print(t2-t1, "pour la première partie")
-        for i in range(T):
-            self.theta = self.theta_total[i]
-            self.total_proposal.append(self.proposal_logpdf(self.total_sample))
-        log_target = self.total_target.reshape((len(self.total_target),))
-        num = np.exp(log_target - np.max(log_target)) #Rescaling target
-        denom = (1/N_total)* np.sum( np.array(np.exp(self.total_proposal))*np.array(self.n_sample)[0:T,None], axis =0)
-        self.final_weights = num/ denom
+        if not self.recycling_iters:
+            t1=time.time()
+            T =len(self.total_sample)
+            self.total_sample=np.row_stack(
+                    [self.total_sample[i] for i in range(T)])
+            self.total_target=np.row_stack(
+                    [self.total_target[i] for i in range(T)])
+            N_total = np.sum(self.n_sample[0:T])
+            t2=time.time()
+            print(t2-t1, "pour la première partie")
+            for i in range(T):
+                self.theta = self.theta_total[i]
+                self.total_proposal.append(self.proposal_logpdf(self.total_sample))
+            log_target = self.total_target.reshape((len(self.total_target),))
+            num = log_target - np.max(log_target) #Rescaling target
+            denom = -np.log(N_total) +logsumexp(self.total_proposal,b = np.array(self.n_sample)[0:T,None],axis = 0)
+            unnom_weights_log = num - denom
+            self.log_marg_lkhd = -np.log(N_total)  + logsumexp(unnom_weights_log)
+            self.final_weights = np.exp(unnom_weights_log - np.max(unnom_weights_log))
+        else :
+            t1=time.time()
+            T =len(self.total_sample)
+            if self.recycling_iters =="auto" :
+                midway = (np.max(self.betas) -np.min(self.betas)) / 2
+                iters_to_keep = list(np.where(self.betas> midway)[0])
+            elif isinstance(self.recycling_iters,int):
+                n = self.recycling_iters
+                iters_to_keep = np.argpartition(self.betas ,-n)[-n:] 
+            else :
+                raise ValueError("Iters to recycle must be auto or int")
+            self.total_sample=np.row_stack(
+                    [self.total_sample[i] for i in iters_to_keep])
+            self.total_target=np.row_stack(
+                    [self.total_target[i] for i in iters_to_keep])
+            N_total = np.sum([self.n_sample[i] for i in iters_to_keep])
+            t2=time.time()
+            print(t2-t1, "pour la première partie")
+            for i in iters_to_keep:
+                self.theta = self.theta_total[i]
+                self.total_proposal.append(self.proposal_logpdf(self.total_sample))
+            log_target = self.total_target.reshape((len(self.total_target),))
+            num = log_target - np.max(log_target) #Rescaling target
+            denom = -np.log(N_total) +logsumexp(self.total_proposal,b = np.array(self.n_sample)[iters_to_keep,None],axis = 0)
+            unnom_weights_log = num - denom
+            self.log_marg_lkhd = -np.log(N_total)  + logsumexp(unnom_weights_log)
+            self.final_weights = np.exp(unnom_weights_log - np.max(unnom_weights_log))
         
     def extract_params(self,n):
         """
@@ -256,22 +334,68 @@ class TAMIS(object):
         to_extract = self.theta_total[(i_max-n)]
         return to_extract
     
-    def plot_convergence(self,title = False,save = False):
-        KL=[]
-        for i in range(self.max_iter + 1):
-            temp =  [resample(self.total_weight[i]) for j in range(100)]
-            KL.append( [np.sum(xlogy(temp[j],temp[j])) + np.log(len(temp[j])) for j in range(100)])
-        arr = np.array(KL).T
-        df = pd.DataFrame(data = arr).melt()
-        df.columns = ["Iteration","Kullback-Leibler divergence"]
-        df2 = pd.DataFrame(data = np.array(self.betas)).melt()
-        df2.columns = ["Iteration","Beta"]
-        df2["Iteration"] = range(self.max_iter+1)
-        fig,ax = plt.subplots()
-        pl =sns.lineplot(x="Iteration",y="Kullback-Leibler divergence", data = df,ci="sd")
-        #pl.set_xticks(range(self.max_iter + 1))
-        ax2 = ax.twinx()
-        sns.lineplot(x="Iteration",y="Beta", data = df2,ci="sd", color = 'r')
+    def plot_convergence(self,title = False,save = False, qty = "KL"):
+        if qty == "KL":
+            KL=[]
+            for i in range(self.max_iter + 1):
+                bootstrapped =  [resample(self.total_weight[i]) for j in range(100)]
+                KL.append( [compute_KL(bootstrapped[j]) for j in range(100)])
+            arr = np.array(KL).T
+            df = pd.DataFrame(data = arr).melt()
+            df.columns = ["Iteration","Kullback-Leibler divergence"]
+            df2 = pd.DataFrame(data = np.array(self.betas)).melt()
+            df2.columns = ["Iteration","Beta"]
+            df2["Iteration"] = range(self.max_iter+1)
+            fig,ax = plt.subplots()
+            pl =sns.lineplot(x="Iteration",
+                             y="Kullback-Leibler divergence", 
+                             data = df,ci="sd",
+                             legend = "brief",
+                             label = "KLD")
+            plt.legend(loc = "center left")
+            #pl.set_xticks(range(self.max_iter + 1))
+            ax2 = ax.twinx()
+            sns.lineplot(x="Iteration",
+                         y="Beta",
+                         data = df2,
+                         ci="sd",
+                         color = 'r',
+                         legend = "brief",
+                         label = "Beta",
+                         linestyle = "--")
+            plt.legend(bbox_to_anchor=(0,.4),loc = "center left")
+        elif qty =="perplexity":
+            perplexity=[]
+            for i in range(self.max_iter + 1):
+                bootstrapped =  [resample(self.total_weight[i]) for j in range(100)]
+                perplexity.append( [compute_perplexity(bootstrapped[j]) for j in range(100)])
+            arr = np.array(perplexity).T
+            df = pd.DataFrame(data = arr).melt()
+            df.columns = ["Iteration","perplexity"]
+            df2 = pd.DataFrame(data = np.array(self.betas)).melt()
+            df2.columns = ["Iteration","Beta"]
+            df2["Iteration"] = range(self.max_iter+1)
+            fig,ax = plt.subplots()
+            pl =sns.lineplot(x="Iteration",
+                             y="perplexity", 
+                             data = df,
+                             ci="sd",
+                             legend = "brief", 
+                             label = "perplexity")
+            plt.legend(loc = "center left")
+            #pl.set_xticks(range(self.max_iter + 1))
+            ax2 = ax.twinx()
+            sns.lineplot(x="Iteration",
+                         y="Beta", 
+                         data = df2,
+                         ci="sd",
+                         color = 'r',
+                         legend = "brief",
+                         label = "Beta",
+                         linestyle = "--")
+            plt.legend(bbox_to_anchor=(0,.4),loc = "center left")
+        else:
+            print("Incorrect quantity")
         if title :
             pl.set_title(title)
         if save :
@@ -294,12 +418,12 @@ class TAMIS(object):
         print("final_step")
         t2=time.time()
         print(t2-t1, "pour les ", i+1,"iterations")
-        self.final_step()
-        print(time.time()-t2, "pour la dernière étape")
-        norm_weights =self.final_weights / np.sum(self.final_weights)
-        self.ESS_final = (np.sum(self.final_weights)**2)/np.sum(self.final_weights**2)
-        self.KL_final = np.sum(xlogy(norm_weights,norm_weights))   + np.log(len(self.final_weights))
-        print(time.time()-t1, "secondes au total")
+        if self.recycle == True:
+            self.final_step()
+            print(time.time()-t2, "pour la dernière étape")
+            self.ESS_final = compute_ESS(self.final_weights)
+            self.KL_final = compute_KL(self.final_weights)
+            print(time.time()-t1, "secondes au total")
         return self
         
     

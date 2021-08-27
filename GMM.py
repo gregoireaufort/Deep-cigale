@@ -5,74 +5,253 @@ Created on Fri Mar 20 12:10:25 2020
 @author: Greg
 """
 
-import mixmod
-from mixmod import gm # gm contains global constants (enum items etc.)
 import itertools
 from utils import logpdf_student
-from matplotlib import pyplot as plt
 from collections import Counter
 import numpy as np
 import scipy.stats as stats
-from pomegranate import *
-from scipy.special import xlogy
+from sklearn.mixture import GaussianMixture
+from pomegranate import IndependentComponentsDistribution,NormalDistribution, GeneralMixtureModel
+from sklearn.utils._testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
+def E_step(sample,n_comp, means,variances, weights_comp):
+    """
+    outputs the logprobas of each obs to be in each cluster
+    """
+    num =  [weights_comp[i]+ 
+             stats.multivariate_normal.logpdf(sample,
+                                              means[i],
+                                              variances[i],
+                                              allow_singular = True) for i in range(n_comp)]
+    denom = np.logaddexp.reduce(num,axis = 0)
+    
+    return num-denom
+
+def M_step(sample, probs,weights, n_comp):
+    """
+    updates the parameters of each components givent the weighted sample and
+    the probs computed in step E
+    """
+    eps = 1e-6
+    means = np.zeros((sample.shape[1],n_comp))
+    covar = []
+    coeffs = np.zeros((sample.shape[0],n_comp))
+    new_weights_comp = np.zeros(n_comp)
+    sample = resampling_data(sample, weights, sampling_type="random")
+    for i in range(n_comp):
+        coeffs[:,i] = np.exp(probs[i])
+        means[:,i] = np.average(sample,
+                                weights = coeffs[:,i],
+                                axis =0)
+        variances = [np.cov(sample[:,j],
+                             aweights = coeffs[:,i]) + eps for j in range(sample.shape[1])]
+        covar.append(np.diag(variances))
+        new_weights_comp[i] = np.mean(np.exp(probs[i]))
+    return means.T,covar, new_weights_comp
+
+    
+def diagonal_EM_homemade(sample,weights, n_comp, init_parameters):
+    """
+    With initial parameters init_parameters, weighted sample and n_comp, computes
+    EM and returns params. Number of steps fixed
+    """
+    means = init_parameters.mean
+    variances = init_parameters.variance
+    weights_comp = init_parameters.proportions
+    for i in range(3):
+        probs = E_step(sample,n_comp, means,variances, weights_comp)
+        means,variances,weights_comp = M_step(sample, probs,weights,n_comp) 
+    params = parameters(means,variances,weights_comp)
+    return params
+
+
 
 
 class parameters(object):
-        def __init__(self,means,variances, proportions):
-            self.mean  = means
-            self.variance = variances
-            self.proportions = proportions
+    """
+    class to have identical attributes between pomegranate and Mixmod outputs
+    """
+    def __init__(self,means,variances, proportions):
+        self.mean  = means
+        self.variance = variances
+        self.proportions = proportions
             
+def extract_params_pome(model,n_dim,n_comp):
+    """
+    Parameters
+    ----------
+    model : TYPE
+        DESCRIPTION.
+    n_dim : TYPE
+        DESCRIPTION.
+    n_comp : TYPE
+        DESCRIPTION.
 
-def pome_diagonal_mixture_with_init(sample,weights_int, n_comp, init_parameters):
-    Distribs = []
-    for i in range(n_comp):
-        Distribs.append(IndependentComponentsDistribution([NormalDistribution(init_parameters.mean[i][j],np.diag(init_parameters.variance[i])[j])for j in range(sample.shape[1])]))
-    model = GeneralMixtureModel(Distribs,weights = init_parameters.proportions)
-    res = model.fit(X=sample, weights  = weights_int, n_jobs = 1)
+    Returns
+    -------
+    params : TYPE
+        DESCRIPTION.
+
+    """
     means= [0]*n_comp
     variances = [0]*n_comp
     for k in range(n_comp) :
-        means[k] = np.array([res.distributions[k].parameters[0][i].parameters[0] for i in range(sample.shape[1])])#means of the 10 1dimensinal distributions of the first component 
-        variances[k] = np.diag([res.distributions[k].parameters[0][i].parameters[1] for i in range(sample.shape[1])])
-    proportions = np.exp(res.weights)
-    params = parameters(means = means, variances = variances, proportions = proportions)
+        comp_params = model.distributions[k].parameters[0]
+        means[k] = np.array([comp_params[i].parameters[0] for i in range(n_dim)])
+        variances[k] = np.diag([comp_params[i].parameters[1] for i in range(n_dim)])
+    proportions = np.exp(model.weights)
+    params = parameters(means = means, 
+                        variances = variances, 
+                        proportions = proportions)
+    return params
+def resampling_data(data,weights,sampling_type ="random"):
+    N = len(data)
+    if sampling_type == "random":
+        norm_weights =  weights/np.sum(weights)
+        sample_index = np.random.choice(range(N), 
+                                        size=N,
+                                        replace=True,
+                                        p = norm_weights)
+        sample = data[sample_index]
+    else : 
+        sample =np.repeat(data,weights, axis = 0)
+    return sample
+
+@ignore_warnings(category = ConvergenceWarning)
+def sklearn_diagonal_mixture_with_init(sample,
+                                        weights_int,
+                                        n_comp, 
+                                        init_parameters,
+                                        sampling_type = "random"):
+    data = resampling_data(sample, weights_int, sampling_type=sampling_type)
+    init_means =  [init_parameters.mean[i] for i in range(n_comp)]
+    # if len(init_parameters.variance[0].shape) == 1:
+    #     init_precisions= [1/init_parameters.variance[i] for i in range(n_comp)]
+    # else :
+    #     init_precisions= [np.linalg.pinv(init_parameters.variance[i]) for i in range(n_comp)]
+        
+    clf = GaussianMixture(n_components = n_comp, 
+                          covariance_type ="diag", 
+                          means_init = init_means, 
+                          #precisions_init =init_precisions,
+                          max_iter = 10)
+    clf.fit(data)
+    params = parameters(means = clf.means_,
+                        variances = clf.covariances_,
+                        proportions = clf.weights_)
+    
+    return params
+def pome_diagonal_mixture_with_init(sample,
+                                    weights_int,
+                                    n_comp, 
+                                    init_parameters):
+    """
+    Parameters
+    ----------
+    model : TYPE
+        DESCRIPTION.
+    n_dim : TYPE
+        DESCRIPTION.
+    n_comp : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    params : TYPE
+        DESCRIPTION.
+
+    """
+    Distribs = []
+    M = sample.shape[1]
+    for i in range(n_comp):
+        mean_comp = init_parameters.mean[i]
+        var_comp = np.diag(init_parameters.variance[i])
+        dists = [NormalDistribution(mean_comp[j],var_comp[j])for j in range(M)]
+        ind_compt_dist = IndependentComponentsDistribution(dists)
+        Distribs.append(ind_compt_dist)
+    model = GeneralMixtureModel(Distribs,weights = init_parameters.proportions)
+    res = model.fit(X=sample, weights  = weights_int, n_jobs = 1)
+    params = extract_params_pome(res, M, n_comp)
     return params
 
 
 def pome_diagonal_mixture_wo_init(sample,weights_int, n_comp):
+    """
+    Parameters
+    ----------
+    model : TYPE
+        DESCRIPTION.
+    n_dim : TYPE
+        DESCRIPTION.
+    n_comp : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    params : TYPE
+        DESCRIPTION.
+
+    """
     model = GeneralMixtureModel.from_samples(distributions = NormalDistribution,
                                                     n_components = n_comp,
                                                     X = sample,
                                                     weights =weights_int,
                                                     n_jobs = 1,
                                                     n_init = 3)
-    means= [0]*n_comp
-    variances = [0]*n_comp
-    for k in range(n_comp) :
-        means[k] = np.array([model.distributions[k].parameters[0][i].parameters[0] for i in range(sample.shape[1])])#means of the 10 1dimensinal distributions of the first component 
-        variances[k] = np.diag([model.distributions[k].parameters[0][i].parameters[1]  for i in range(sample.shape[1])])
-    proportions = np.exp(model.weights)
-    params = parameters(means = means, variances = variances, proportions = proportions)
+    M = sample.shape[1]
+    params = extract_params_pome(model, M, n_comp)
     return params
 
 def modify_weights(weights,isint,trunc):
+    """
+    Parameters
+    ----------
+    model : TYPE
+        DESCRIPTION.
+    n_dim : TYPE
+        DESCRIPTION.
+    n_comp : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    params : TYPE
+        DESCRIPTION.
+
+    """
     trunc =  np.quantile(weights,trunc)
     weights2  = weights.copy()
     weights2[weights<trunc] = trunc
-    print(trunc)
     if isint == True:
-        weights_int = np.int64((1/trunc)*weights2) +1
+        weights_int = np.int64((1/trunc)*weights2) + 1
         return weights_int
     return weights2
 
 
 
 def pome_diagonal_mixture(sample,weights, n_comp, init_parameters):
-    weights = modify_weights(weights,False,0.6)
+    """
+    Parameters
+    ----------
+    model : TYPE
+        DESCRIPTION.
+    n_dim : TYPE
+        DESCRIPTION.
+    n_comp : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    params : TYPE
+        DESCRIPTION.
+
+    """
+    
     try:
-        #assert False
-        params = pome_diagonal_mixture_with_init(sample,weights, n_comp, init_parameters)
+        params = pome_diagonal_mixture_with_init(sample,
+                                                 weights,
+                                                 n_comp,
+                                                 init_parameters)
         if np.isinf(params.proportions[0]):
             error = True
             assert not error
@@ -85,89 +264,31 @@ def pome_diagonal_mixture(sample,weights, n_comp, init_parameters):
     return params
 
 
-def mixmod_diagonal_mixture_with_init(sample,weights_int, n_comp, init_parameters):
-    par = mixmod.GaussianParameter(proportions=init_parameters.proportions,
-                                            mean=init_parameters.mean,
-                                            variance=init_parameters.variance)
-    ini = mixmod.init(name=gm.PARAMETER, parameter=par)
-    algo = mixmod.algo(nb_iteration =3)
-    st = mixmod.strategy(init=ini, algo = algo, seed = 42)
-    cluster = mixmod.cluster(sample,
-                          n_comp,
-                          gm.QUANTITATIVE,
-                          strategy = st,
-                          weight = weights_int, 
-                          models = mixmod.gaussian_model(family = gm.DIAGONAL))
-    params = cluster.best_result.parameters
-    return params
-
-def mixmod_diagonal_mixture_wo_init(sample,weights_int, n_comp):
-    algo = mixmod.algo(nb_iteration =3)
-    st = mixmod.strategy(algo = algo, seed = 42)
-    cluster = mixmod.cluster(sample,
-                          n_comp,
-                          gm.QUANTITATIVE, 
-                          strategy = st,
-                          weight = weights_int, 
-                          models = mixmod.gaussian_model(family = gm.DIAGONAL))
-    params = cluster.best_result.parameters
-    return params
-def mixmod_diagonal_mixture_wo_ncomp(sample,weights_int):
-    algo = mixmod.algo(nb_iteration =3)
-    st = mixmod.strategy(algo = algo, seed = 42)
-    cluster = mixmod.cluster(sample,
-                      data_type = gm.QUANTITATIVE, 
-                      strategy = st,
-                      nb_cluster=1,
-                      weight = weights_int, 
-                      models = mixmod.gaussian_model(family = gm.DIAGONAL))
-
-    params = cluster.best_result.parameters
-    return params
-def error_mixmod_params(params):
-    return np.isnan(params.mean[0][0]) == False
-
-def ESS(weights):
-    return (np.sum(weights)**2)/np.sum(weights**2)
-
-
-def coef_variation(weights):
-    return np.std(weights)/np.mean(weights)
-
-def kullback_temperature(weights):
-    norm_weights = weights / np.sum(weights)
-    KL= np.sum(xlogy(norm_weights,norm_weights))  
-    return KL + np.log(len(norm_weights))
-
-def mixmod_diagonal_mixture(sample,weights, n_comp, init_parameters):
-    weights = modify_weights(weights,True,0.6)
-    if init_parameters is not None:
-        try:
-            params = mixmod_diagonal_mixture_with_init(sample,
-                                              weights,
-                                              n_comp, 
-                                              init_parameters)
-            assert error_mixmod_params(params)
-        except :
-            try:
-                print("had to change init")
-                params = mixmod_diagonal_mixture_wo_init(sample,
-                                                         weights,
-                                                         n_comp)
-                assert error_mixmod_params(params)
-            except:
-                print("also had to change n_comp")
-                params = mixmod_diagonal_mixture_wo_ncomp(sample,weights)
-                assert error_mixmod_params(params), "EM failed"
-        
-    else:    
-        
-        params =mixmod_diagonal_mixture_wo_ncomp(sample,weights)
-    return params
-        
-def GMM_fit(sample, weights,n_comp = 3, init_parameters = None):
-    #params = mixmod_diagonal_mixture(sample, weights, n_comp, init_parameters)
-    params = pome_diagonal_mixture(sample, weights, n_comp, init_parameters)
+def GMM_fit(sample, 
+            weights,
+            tau = 0.6,
+            n_comp = 3, 
+            init_parameters = None,
+            EM_solver = "homemade",
+            integer_weights = False):
+    weights = modify_weights(weights,integer_weights,tau)
+    
+    if EM_solver =="pomegranate" :
+        params = pome_diagonal_mixture(sample, weights, n_comp, init_parameters)
+    elif EM_solver == "sklearn":
+        if integer_weights == True : 
+            sampling_type = "deterministic"
+        else : 
+            sampling_type = "random"
+        params = sklearn_diagonal_mixture_with_init(sample,
+                                        weights,
+                                        n_comp, 
+                                        init_parameters,
+                                        sampling_type)
+    elif EM_solver =="homemade":
+        params = diagonal_EM_homemade(sample,weights,n_comp,init_parameters)
+    else :
+        assert ValueError("unknown solver")
 
     return params
     
@@ -261,9 +382,8 @@ class Mixture_gaussian(object):
     
     def logpdf(x,means, covs,weights):
          n_comp = len(means)
-         lpdf =  np.logaddexp.reduce(
-             [np.log(weights[i]) +stats.multivariate_normal.logpdf(x,means[i],covs[i]) for i in range(n_comp)],axis = 0)
+         a=[np.log(weights[i]) + stats.multivariate_normal.logpdf(x,means[i],covs[i], allow_singular = True) for i in range(n_comp)]
+         lpdf =  np.logaddexp.reduce(a,axis = 0)
          return lpdf
 
-        # params = parameters(means = means, variances = variances, proportions = proportions)
-        
+

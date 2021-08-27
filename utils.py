@@ -9,10 +9,7 @@ Created on Mon May 25 13:06:15 2020
 
 import numpy as np
 from scipy.interpolate import griddata
-import scipy.stats as stats
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from scipy.optimize import bisect, minimize_scalar
 from math import gamma
 from scipy.special import xlogy
 
@@ -51,15 +48,22 @@ def kl_mvn(m0, S0, m1, S1):
 def gauss(x,y,Sigma,mu):
     mu = np.array(mu)
     X=np.vstack((x,y)).T
-    #return  stats.multivariate_normal.pdf(X,mean = mu, cov = Sigma)
     mat_multi=np.dot((X-mu[None,...]).dot(np.linalg.inv(Sigma)),(X-mu[None,...]).T)
     return  np.diag(np.exp(-1*(mat_multi)))
 
-        
+def remove_inf(weights,sample):
+    idx_finite = np.where(np.isfinite(weights))
+    weights = weights.copy()[idx_finite]
+    sample = sample.copy()[idx_finite]
+    return weights,sample
 def mean_res(TATAMIS):
-    return np.average(TATAMIS.total_sample, weights=TATAMIS.final_weights,axis = 0)
+    weights,sample = remove_inf(TATAMIS.final_weights,TATAMIS.total_sample)
+    weights/=np.sum(weights)
+    return np.average(sample, weights=weights,axis = 0)
 def cov_res(TATAMIS):
-    return np.diag(np.cov(TATAMIS.total_sample.T, aweights=TATAMIS.final_weights[:,]))
+    weights,sample = remove_inf(TATAMIS.final_weights,TATAMIS.total_sample)
+    weights/=np.sum(weights)
+    return np.diag(np.cov(sample.T, aweights=weights[:,]))
 
 def logpdf_student(x,mean,cov,df=3):
         '''Computes logpdf of multivariate t distribution
@@ -90,10 +94,10 @@ def logpdf_student(x,mean,cov,df=3):
         return log_num-log_denom
         
 def plot_contour(x,y,z,alpha, color):
-    npts = 10000
+    npts = 1000
     # define grid.
-    xi = np.linspace(-4.1, 4.1, 1000)
-    yi = np.linspace(-4.1, 4.1, 1000)
+    xi = np.linspace(-4.1, 4.1, npts)
+    yi = np.linspace(-4.1, 4.1, npts)
     ## grid the data.
     zi = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
     levels = [0.1,0.3,0.5,0.7,0.9]
@@ -168,4 +172,28 @@ def plot_convergence(MAMIS,target = None,cluster = None,prev_target = None, titl
                              prev_target = prev_target,
                              n=i,
                              title = title) 
-            
+    
+def compute_ESS(weights):
+    """
+    computes the ESS estimator
+    """
+    with np.errstate(divide ="ignore", invalid ="ignore"):
+        weights /= np.sum(weights)
+        ESS = 1/np.sum(weights**2)
+    return ESS
+
+def compute_marginal_likelihood(weights):
+    return np.mean(weights)
+
+def compute_KL(weights):
+    """
+    computes the KL estimator
+    """
+    norm_weights = weights / np.sum(weights)
+    KL= np.sum(xlogy(norm_weights,norm_weights))  
+    return KL + np.log(len(norm_weights))
+
+def compute_perplexity(weights):
+    norm_weights = weights / np.sum(weights)
+    perp = -np.sum(xlogy(norm_weights,norm_weights))  
+    return np.exp(perp)/len(weights)
