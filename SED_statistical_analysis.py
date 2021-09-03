@@ -89,6 +89,7 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     width = CIGALE_parameters["nebular"]["lines_width"]
     wave = observed_galaxy["spectroscopy_wavelength"]
     err = observed_galaxy["spectroscopy_err"]**2
+    covar_lines = 0*np.eye(2)
     if "lines" in CIGALE_parameters["mode"]:
         limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
         lines = [limit_spec(wave,err,limit[0],limit[1]) for limit in limits]
@@ -97,8 +98,7 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
         covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
         err =  np.setdiff1d(err,err_to_remove)
         wave = np.setdiff1d(wave,wave_to_remove)
-    else :
-        covar_lines = [0]
+
     _,covar_continuum = binning_variances(wave,err, CIGALE_parameters["n_bins"])
     return np.diag(covar_lines), np.diag(covar_continuum)
 
@@ -239,7 +239,7 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
     n_jobs = CIGALE_parameters["n_jobs"]
     cigale_input = sample_to_cigale_input(sample, CIGALE_parameters)
     global _compute_scaled_SED
-    if CIGALE_parameters["deep_modules"]:
+    if CIGALE_parameters["deep_modules"] is not None:
         for deep_module in CIGALE_parameters["deep_modules"]:
             importlib.reload(deep_module)
     
@@ -322,7 +322,7 @@ class target_SED(object):
         target_spectro = self.target_spectro
         covar_photo = self.covar_photo
         covar_spectro = self.covar_spectro
-        target_lines = self.target_lines
+        target_lines = None
         covar_lines = self.covar_lines
         constants = self.pre_computed_constants
         CIGALE_parameters = self.CIGALE_parameters
@@ -438,7 +438,7 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
     
     spectro = Table.read(spectro_file)
     spectro_flux = np.array(spectro["Fnu"])
-    spectro_err = np.array(0.1*spectro_flux)
+    spectro_err = np.array(0.5*spectro_flux)
     spectro_wavelength = np.array(spectro["wavelength"])
     observed_galaxy  = {"spectroscopy_wavelength":spectro_wavelength,
                         "spectroscopy_fluxes":spectro_flux,
