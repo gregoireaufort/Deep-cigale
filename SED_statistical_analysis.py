@@ -424,8 +424,10 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
     table = table.to_pandas()
     if ident :
         photo = table[list(table.columns[4:32])][table['id'] == ident]
+        redshift =table["redshift"][table["id"]==ident][0]
     else :
         photo = table[list(table.columns[4:32])][0]
+        redshift = table["redshift"][0][0]
     bands = []
     err = []
     for band in photo.columns:
@@ -445,8 +447,10 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
                         "spectroscopy_err" : spectro_err,
                         "photometry_fluxes" : photo_flux,
                         "photometry_err" :photo_err,
-                        "bands" : bands
+                        "bands" : bands,
+                        "redshift" : redshift
                         }
+    
     return observed_galaxy
 def split_name_params(columns):
     new_columns = []
@@ -462,12 +466,12 @@ def plot_result(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
     to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
     try:
-        g = sns.PairGrid(to_plot, corner =True)
+        g = sns.PairGrid(to_plot, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
         g.map_diag(sns.kdeplot,fill = False, levels = 10)
     except :
         to_plot2 = to_plot.sample(1000)
-        g = sns.PairGrid(to_plot2, corner =True)
+        g = sns.PairGrid(to_plot2, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
         g.map_diag(sns.kdeplot,fill = False, levels = 10)
 
@@ -482,11 +486,10 @@ def plot_result(CIGALE_parameters):
     fig,axes = plt.subplots(nrows = n_rows, ncols = n_cols)
     for i, column in enumerate(to_plot_hist.columns):
         #plt.figure()
-        sns.histplot(x=to_plot_hist[column], 
+        sns.histplot(x=to_plot_hist[column].astype(str), 
                      weights =results["weights"], 
                      kde= False,
                      ax = axes[i//n_cols,i%n_cols])
-                     #discrete = True)
         #plt.show()
         
         

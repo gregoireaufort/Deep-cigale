@@ -27,15 +27,15 @@ galaxy_obs = SED_statistical_analysis.read_galaxy_fits("observations.fits",
 
 
 bands = list(galaxy_obs["bands"])
-pcigale.sed_modules.get_module('deep_bc03_pca_norm')
-module_list = ['deep_sfhdelayed', 'deep_bc03_pca_norm','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
+#pcigale.sed_modules.get_module('deep_bc03_pca_norm')
+module_list = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
 path_deep = '/home/aufort/Desktop/cigale-master/params_comparison.txt'
-file_store = 'store_parameters_test_photo.csv'
-deep_modules = [pcigale.sed_modules.deep_bc03_pca_norm]
-module_parameters_to_fit = {'tau_main': {"type":"log","min":2,"max" :5},
-            'age_main': {"type":"unif","min":500,"max" :10000},
+file_store = 'store_parameters_test_photo_prior_jorge.csv'
+deep_modules = None#[pcigale.sed_modules.deep_bc03_pca_norm]
+module_parameters_to_fit = {'tau_main': {"type":"unif","min":1500,"max" :3000},
+            'age_main': {"type":"unif","min":1000,"max" :10000},
             'tau_burst':{"type":"unif","min":100,"max" :10000},
-            'f_burst': {"type":"unif","min":0,"max" :0.05},
+            'f_burst': {"type":"unif","min":0,"max" :0.2},
             'age_burst': {"type":"log","min":1,"max" :2},
     
 }
@@ -52,17 +52,17 @@ module_parameters_discrete = {'sfr_A' : [1.],
                              'Rv' : [3.1],
                              'imf' : [1],
                              'metallicity' : [0.02],
-                             'qpah' : [2.5],
-                             'umin' : [1.0],
+                             'qpah' : [0.47, 1.12, 1.77, 2.5],
+                             'umin' : [5.0, 10.0, 25.0],
                              'alpha' : [2],
-                             'gamma' : [0.5],
+                             'gamma' : [0.02],
                              'separation_age': [10],
                              'logU' :[-3.5, -2.5, -1.5],
                              'f_esc': [0.0],
                              'f_dust' : [0.0],
                              'lines_width' :[300.0],
                              'emission' :[True],
-                             'redshift':[1],
+                             'redshift':[galaxy_obs["redshift"]],
                              'filters':["B_B90 & V_B90 & FUV"],
 }
 wavelength_limits = {"min" : 645,"max" : 1800}
@@ -105,7 +105,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "nebular" :nebular_params,
                     "bands" :bands,
                     "mode" : ["photo"],
-                    "n_jobs" : 15}
+                    "n_jobs" : 12}
 
 dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
 n_comp = 4 #arbitrary
