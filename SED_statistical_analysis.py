@@ -460,11 +460,10 @@ def split_name_params(columns):
         new_columns.append(col)
     return new_columns
 
-
-
 def plot_result(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
     to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
+    
     try:
         g = sns.PairGrid(to_plot, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
@@ -506,3 +505,15 @@ def analyse_results(CIGALE_parameters):
                      "max":"later : to be added to TAMIS",
                      }
     return res
+
+
+
+#to put in utils
+
+
+# line_dict_fit = {"log(tau_main)" : np.log10(truths["tau_main"]),
+#                 'age_main':truths["age_main"],
+#                  'tau_burst':truths["tau_burst"],
+#                  'f_burst':truths["f_burst"],
+#                  'log(age_burst)':np.log10(truths["age_burst"])}
+# g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
