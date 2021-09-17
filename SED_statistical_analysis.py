@@ -374,6 +374,9 @@ def create_output_files(CIGALE_parameters,result):
     name_col = parameters.columns[0]
     clean = parameters.drop(parameters[parameters[name_col]==name_col].index)
     clean["weights"] = result.final_weights
+    temp = np.zeros(len(result.final_weights))
+    temp[result.max_target] = 1
+    clean["MAP"] = temp
     clean.columns = split_name_params(clean.columns)
     clean.to_csv(CIGALE_parameters['file_store'],index = False)
     
@@ -460,7 +463,10 @@ def split_name_params(columns):
         new_columns.append(col)
     return new_columns
 
-def plot_result(CIGALE_parameters):
+def plot_result(CIGALE_parameters, line_dict_fit = None):
+    ### MANQUE line_drawer...
+    
+    
     results = pd.read_csv(CIGALE_parameters["file_store"])
     to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
     
@@ -468,12 +474,13 @@ def plot_result(CIGALE_parameters):
         g = sns.PairGrid(to_plot, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
         g.map_diag(sns.kdeplot,fill = False, levels = 10)
+        #g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
     except :
         to_plot2 = to_plot.sample(1000)
         g = sns.PairGrid(to_plot2, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
         g.map_diag(sns.kdeplot,fill = False, levels = 10)
-
+        #g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
     to_hist = []
     for param in CIGALE_parameters["module_parameters_discrete"]:
         if len(results[param].unique()) > 1:
@@ -495,6 +502,7 @@ def plot_result(CIGALE_parameters):
 def analyse_results(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
     to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
+    
     res = {}
     for col in to_plot.columns:
         weighted_stats = DescrStatsW(to_plot[col], weights = results["weights"])
@@ -502,18 +510,7 @@ def analyse_results(CIGALE_parameters):
                      "var":weighted_stats.var,
                      "sd" :weighted_stats.std,
                      #"95% credible interval":np.array(weighted_stats.quantile([0.05,0.95])),
-                     "max":"later : to be added to TAMIS",
+                     "max":to_plot[results["MAP"]==1][col].array[0],
                      }
     return res
 
-
-
-#to put in utils
-
-
-# line_dict_fit = {"log(tau_main)" : np.log10(truths["tau_main"]),
-#                 'age_main':truths["age_main"],
-#                  'tau_burst':truths["tau_burst"],
-#                  'f_burst':truths["f_burst"],
-#                  'log(age_burst)':np.log10(truths["age_burst"])}
-# g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')

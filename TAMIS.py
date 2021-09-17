@@ -296,6 +296,7 @@ class TAMIS(object):
             unnom_weights_log = num - denom
             self.log_marg_lkhd = -np.log(N_total)  + logsumexp(unnom_weights_log)
             self.final_weights = np.exp(unnom_weights_log - np.max(unnom_weights_log))
+            self.max_target = np.argmax(self.total_target)
         else :
             t1=time.time()
             T =len(self.total_sample)
@@ -323,6 +324,7 @@ class TAMIS(object):
             unnom_weights_log = num - denom
             self.log_marg_lkhd = -np.log(N_total)  + logsumexp(unnom_weights_log)
             self.final_weights = np.exp(unnom_weights_log - np.max(unnom_weights_log))
+            self.max_target = np.argmax(self.total_target)
         
     def extract_params(self,n):
         """

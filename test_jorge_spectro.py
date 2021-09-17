@@ -139,8 +139,6 @@ TAMIS_parameters = {'dim_prior' : dim_prior,
 result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters)
 SED_statistical_analysis.analyse_results(CIGALE_parameters)
 
-SED_statistical_analysis.plot_result(CIGALE_parameters)
-
 
 
 import astropy
@@ -155,6 +153,14 @@ B[0]["best.sfh.f_burst"]
 B[0]["best.sfh.age_burst"]
 
 
+
+line_dict_fit = {"log(tau_main)" : np.log10(B[0]["best.sfh.tau_main"]),
+                'age_main':B[0]["best.sfh.age_main"],
+                  'tau_burst':B[0]["best.sfh.tau_burst"],
+                  'f_burst':B[0]["best.sfh.f_burst"],
+                  'log(age_burst)':np.log10(B[0]["best.sfh.age_burst"])}
+
+SED_statistical_analysis.plot_result(CIGALE_parameters, line_dict_fit)
 
 
 module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
