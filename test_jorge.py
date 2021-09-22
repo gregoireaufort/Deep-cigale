@@ -15,14 +15,28 @@ from utils import *
 import pcigale.sed_modules
 from GMM import GMM_fit, Mixture_t, Mixture_gaussian,multivariate_t
 
+import astropy
 import numpy as np
+
 np.random.seed(42)
 
 
+A=astropy.io.fits.open("/home/aufort/Desktop/jorge/results.fits")
+B = A[1].data
+galaxy_targ = B[0]
+
+
+
+fit_jorge = {"tau_main" : galaxy_targ["best.sfh.tau_main"],
+                'age_main':galaxy_targ["best.sfh.age_main"],
+                  'tau_burst':galaxy_targ["best.sfh.tau_burst"],
+                  'f_burst':galaxy_targ["best.sfh.f_burst"],
+                  'age_burst':galaxy_targ["best.sfh.age_burst"]}
+
 
 galaxy_obs = SED_statistical_analysis.read_galaxy_fits("observations.fits", 
-                 "222172_best_model.fits",
-                 ident = 222172)
+                 str(galaxy_targ["id"])+"_best_model.fits",
+                 ident = galaxy_targ["id"])
 
 
 
@@ -30,7 +44,7 @@ bands = list(galaxy_obs["bands"])
 pcigale.sed_modules.get_module('deep_bc03_pca_norm')
 module_list = ['deep_sfhdelayed', 'deep_bc03_pca_norm','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
 path_deep = '/home/aufort/Desktop/cigale-master/params_comparison.txt'
-file_store = 'store_parameters_test_photo_prior_jorge.csv'
+file_store = 'store_parameters_'+str(galaxy_targ["id"])+'_deep.csv'
 deep_modules = [pcigale.sed_modules.deep_bc03_pca_norm]
 module_parameters_to_fit = {'tau_main': {"type":"unif","min":1500,"max" :3000},
             'age_main': {"type":"unif","min":1000,"max" :10000},
@@ -66,33 +80,7 @@ module_parameters_discrete = {'sfr_A' : [1.],
                              'filters':["B_B90 & V_B90 & FUV"],
 }
 wavelength_limits = {"min" : 645,"max" : 1800}
-wavelength_lines =[121.60000000000001,
- 133.5,
- 139.70000000000002,
- 154.9,
- 164.0,
- 166.5,
- 190.9,
- 232.60000000000002,
- 279.8,
- 372.70000000000005,
- 379.8,
- 383.5,
- 386.90000000000003,
- 388.90000000000003,
- 397.0,
- 407.0,
- 410.20000000000005,
- 434.0,
- 486.1,
- 495.90000000000003,
- 500.70000000000005,
- 630.0,
- 654.8000000000001,
- 656.3000000000001,
- 658.4000000000001,
- 671.6,
- 673.1]
+wavelength_lines =[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
 nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
 CIGALE_parameters = {"module_list":module_list,
                     "path_deep" : path_deep,
@@ -135,47 +123,98 @@ TAMIS_parameters = {'dim_prior' : dim_prior,
                     "verbose" : True
     
 }
-result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters)
-
-SED_statistical_analysis.plot_result(CIGALE_parameters)
-
+result = SED_statistical_analysis.fit(galaxy_obs,
+                                      CIGALE_parameters, TAMIS_parameters)
 
 
-# module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
-# file_store_normal = 'store_parameters_test_normal.csv'
-# #NEED TO AUTOMATE THIS PART, USELESS TO SET UP
-# var0 = [3]*dim_prior
-# mean0 = 0
-# init_mean = stats.uniform.rvs(size =(n_comp,dim_prior),loc=-1,scale = 2 )
-# init = [init_mean,
-#          np.array([np.diag(var0)]*n_comp),
-#          np.ones((n_comp,))/n_comp]
-# init_theta= theta_params(init)
 
-# TAMIS_parameters = {'dim_prior' : dim_prior,
-#                     'n_comp' : n_comp,
-#                     'ESS_tol' : ESS_tol,
-#                     'proposal' : proposal,
-#                     'T_max' : T_max,
-#                     'n_sample' : n_sample,
-#                     'init_theta' : init_theta,
-#                     'alpha':alpha,
-#                     "verbose" : True
-    
-# }
-# CIGALE_parameters_normal = {"module_list":module_list_normal,
-#                     "path_deep" : path_deep,
-#                     "file_store":file_store_normal,
-#                     "deep_modules":deep_modules,
-#                     "module_parameters_to_fit":module_parameters_to_fit,
-#                     "module_parameters_discrete":module_parameters_discrete,
-#                     "n_bins":10,
-#                     "wavelength_limits" : wavelength_limits,
-#                     "nebular" :nebular_params,
-#                     "bands" :bands,
-#                     "mode" : ["spectro"],
-#                     "n_jobs" : 15}
-# result_normal = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters_normal, TAMIS_parameters)
+SED_statistical_analysis.plot_result(CIGALE_parameters,
+                                     line_dict_fit = fit_jorge,
+                                     title = "Deep jorge 1")
 
-# SED_statistical_analysis.plot_result(CIGALE_parameters_normal)
+
+
+module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
+file_store_normal = 'store_parameters_test_normal.csv'
+
+CIGALE_parameters_normal = {"module_list":module_list_normal,
+                    "path_deep" : path_deep,
+                    "file_store":file_store_normal,
+                    "deep_modules":None,
+                    "module_parameters_to_fit":module_parameters_to_fit,
+                    "module_parameters_discrete":module_parameters_discrete,
+                    "n_bins":10,
+                    "wavelength_limits" : wavelength_limits,
+                    "nebular" :nebular_params,
+                    "bands" :bands,
+                    "mode" : ["photo"],
+                    "n_jobs" : 10}
+result_normal = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters_normal, TAMIS_parameters)
+
+SED_statistical_analysis.plot_result(CIGALE_parameters_normal,
+                                     line_dict_fit = fit_jorge,
+                                     title = "CIGALE Jorge 1")
 # SED_statistical_analysis.analyse_results(CIGALE_parameters_normal)
+
+
+
+galaxy_targ_2 = B[1]
+
+
+fit_jorge_2 = {"tau_main" : galaxy_targ_2["best.sfh.tau_main"],
+                'age_main':galaxy_targ_2["best.sfh.age_main"],
+                  'tau_burst':galaxy_targ_2["best.sfh.tau_burst"],
+                  'f_burst':galaxy_targ_2["best.sfh.f_burst"],
+                  'age_burst':galaxy_targ_2["best.sfh.age_burst"]}
+
+
+galaxy_obs_2= SED_statistical_analysis.read_galaxy_fits("observations.fits", 
+                 str(galaxy_targ_2["id"])+"_best_model.fits",
+                 ident = galaxy_targ_2["id"])
+
+file_store = 'store_parameters_'+str(galaxy_targ_2["id"])+'_deep.csv'
+CIGALE_parameters["file_store"]=file_store
+result2 = SED_statistical_analysis.fit(galaxy_obs_2,
+                                      CIGALE_parameters, TAMIS_parameters)
+
+
+SED_statistical_analysis.plot_result(CIGALE_parameters,
+                                     line_dict_fit = fit_jorge_2 ,
+                                     title = "Deep jorge 2")
+
+
+file_store_normal_2 = 'store_parameters_test_normal.csv'
+CIGALE_parameters_normal_2 = {"module_list":module_list_normal,
+                    "path_deep" : path_deep,
+                    "file_store":file_store_normal_2,
+                    "deep_modules":None,
+                    "module_parameters_to_fit":module_parameters_to_fit,
+                    "module_parameters_discrete":module_parameters_discrete,
+                    "n_bins":10,
+                    "wavelength_limits" : wavelength_limits,
+                    "nebular" :nebular_params,
+                    "bands" :bands,
+                    "mode" : ["photo"],
+                    "n_jobs" : 10}
+
+result_normal_2 = SED_statistical_analysis.fit(galaxy_obs_2,
+                                      CIGALE_parameters_normal_2, TAMIS_parameters)
+
+
+
+
+SED_statistical_analysis.plot_result(CIGALE_parameters_normal_2,
+                                     line_dict_fit = fit_jorge_2 ,
+                                     title = "Normal jorge 2")
+
+
+import pandas as pd
+results_read = pd.read_csv(CIGALE_parameters_normal["file_store"])
+A = results_read[results_read["MAP"]==1]
+B = A.iloc[0].to_dict()
+param_frame = B
+modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+from pcigale.warehouse import SedWarehouse
+warehouse = SedWarehouse(nocache = module_list)
+SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)

@@ -427,7 +427,7 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
     table = table.to_pandas()
     if ident :
         photo = table[list(table.columns[4:32])][table['id'] == ident]
-        redshift =table["redshift"][table["id"]==ident][0]
+        redshift =table["redshift"][table["id"]==ident].iloc[0]
     else :
         photo = table[list(table.columns[4:32])][0]
         redshift = table["redshift"][0][0]
@@ -462,8 +462,14 @@ def split_name_params(columns):
             col = col.split(".")[1]
         new_columns.append(col)
     return new_columns
+def line_drawer(x=None,y=None, hue = None, line_dict = None, line_color = 'r',**kwargs):
+    ax = plt.gca()
+    if line_dict is not None :
+        if x.name in line_dict:
+            ax.axvline(line_dict[x.name],0,1,color = line_color)
+    return ax
 
-def plot_result(CIGALE_parameters, line_dict_fit = None):
+def plot_result(CIGALE_parameters, line_dict_fit = None, title = None):
     ### MANQUE line_drawer...
     
     
@@ -472,15 +478,17 @@ def plot_result(CIGALE_parameters, line_dict_fit = None):
     
     try:
         g = sns.PairGrid(to_plot, corner =True,diag_sharey=False)
-        g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
-        g.map_diag(sns.kdeplot,fill = False, levels = 10)
-        #g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
+        g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 5)
+        g.map_diag(sns.kdeplot,fill = False, weights =results["weights"],levels = 5)
+        g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
+        g.fig.suptitle(title)
     except :
-        to_plot2 = to_plot.sample(1000)
+        to_plot2 = to_plot.sample(100)
         g = sns.PairGrid(to_plot2, corner =True,diag_sharey=False)
-        g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 10)
-        g.map_diag(sns.kdeplot,fill = False, levels = 10)
-        #g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
+        g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 5)
+        g.map_diag(sns.kdeplot,fill = False, weights =results["weights"],levels = 5)
+        g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
+        g.fig.suptitle(title)
     to_hist = []
     for param in CIGALE_parameters["module_parameters_discrete"]:
         if len(results[param].unique()) > 1:
@@ -497,7 +505,8 @@ def plot_result(CIGALE_parameters, line_dict_fit = None):
                      kde= False,
                      ax = axes[i//n_cols,i%n_cols])
         #plt.show()
-        
+    if title :
+        plt.suptitle(title)
         
 def analyse_results(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
