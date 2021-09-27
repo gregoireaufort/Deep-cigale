@@ -278,7 +278,22 @@ def lim_target_spectro(observed_galaxy,CIGALE_parameters):
     return binned_spec
 
 
-
+def extract_target(observed_galaxy,CIGALE_parameters):
+    if  observed_galaxy["photometry_fluxes"] is not None and "photo" in CIGALE_parameters["mode"]:
+            target_photo = observed_galaxy["photometry_fluxes"]
+            covar_photo = np.diag(observed_galaxy["photometry_err"]**2)
+    else :
+        target_photo,covar_photo = None, None
+    
+    if observed_galaxy["spectroscopy_fluxes"]  is not None and "spectro" in CIGALE_parameters["mode"]:
+        target_spectro = lim_target_spectro(observed_galaxy,
+                                                 CIGALE_parameters)
+        # self.target_lines = extract_lines(gal,wave,spec) # rewrite
+        covar_lines,covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
+    else : 
+        target_spectro, covar_spectro = None, None
+        target_lines, covar_lines = None, None
+    return target_photo,target_lines, target_spectro,covar_photo,covar_spectro, covar_lines
 
 class target_SED(object):
     """ Class to be used to call TAMIS, must have a self.dim, self.log_likelihood
@@ -291,21 +306,10 @@ class target_SED(object):
                  dim_prior,
                  weight_spectro = 1):
         self.dim = dim_prior
-        if  observed_galaxy["photometry_fluxes"] is not None and "photo" in CIGALE_parameters["mode"]:
-            self.target_photo = observed_galaxy["photometry_fluxes"]
-            self.covar_photo = np.diag(observed_galaxy["photometry_err"]**2)
-        else :
-            self.target_photo,self.covar_photo = None, None
-        
-        if observed_galaxy["spectroscopy_fluxes"]  is not None and "spectro" in CIGALE_parameters["mode"]:
-            self.target_spectro = lim_target_spectro(observed_galaxy,
-                                                     CIGALE_parameters)
-            # self.target_lines = extract_lines(gal,wave,spec) # rewrite
-            self.covar_lines,self.covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
-        else : 
-            self.target_spectro, self.covar_spectro = None, None
-            self.target_lines, self.covar_lines = None, None
-            
+        targ_covar= extract_target(observed_galaxy,CIGALE_parameters)
+        self.target_photo,self.target_lines, = targ_covar[0:2]
+        self.target_spectro,self.covar_photo = targ_covar[2:4]
+        self.covar_spectro, self.covar_lines = targ_covar[4:6]
         self.pre_computed_constants =scale_factor_pre_computation(self.target_photo ,
                                                                   self.covar_photo,
                                                                   self.target_spectro,

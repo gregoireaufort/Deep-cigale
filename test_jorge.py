@@ -9,12 +9,13 @@ Created on Fri May 21 17:23:20 2021
 
 
 import SED_statistical_analysis
-import importlib
 import scipy.stats as stats
 from utils import *
 import pcigale.sed_modules
-from GMM import GMM_fit, Mixture_t, Mixture_gaussian,multivariate_t
-
+from GMM import Mixture_gaussian
+from pcigale.warehouse import SedWarehouse
+from pcigale.data import Database
+import pandas as pd
 import astropy
 import numpy as np
 
@@ -93,7 +94,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "nebular" :nebular_params,
                     "bands" :bands,
                     "mode" : ["photo"],
-                    "n_jobs" : 12}
+                    "n_jobs" : 16}
 
 dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
 n_comp = 4 #arbitrary
@@ -135,7 +136,7 @@ SED_statistical_analysis.plot_result(CIGALE_parameters,
 
 
 module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
-file_store_normal = 'store_parameters_test_normal.csv'
+file_store_normal = 'store_parameters_'+str(galaxy_targ["id"])+'_normal.csv'
 
 CIGALE_parameters_normal = {"module_list":module_list_normal,
                     "path_deep" : path_deep,
@@ -173,17 +174,18 @@ galaxy_obs_2= SED_statistical_analysis.read_galaxy_fits("observations.fits",
                  ident = galaxy_targ_2["id"])
 
 file_store = 'store_parameters_'+str(galaxy_targ_2["id"])+'_deep.csv'
-CIGALE_parameters["file_store"]=file_store
+CIGALE_parameters_2=CIGALE_parameters.copy()
+CIGALE_parameters_2["file_store"]=file_store
 result2 = SED_statistical_analysis.fit(galaxy_obs_2,
-                                      CIGALE_parameters, TAMIS_parameters)
+                                      CIGALE_parameters_2, TAMIS_parameters)
 
 
-SED_statistical_analysis.plot_result(CIGALE_parameters,
+SED_statistical_analysis.plot_result(CIGALE_parameters_2,
                                      line_dict_fit = fit_jorge_2 ,
                                      title = "Deep jorge 2")
 
 
-file_store_normal_2 = 'store_parameters_test_normal.csv'
+file_store_normal_2 = 'store_parameters_'+str(galaxy_targ_2["id"])+'_normal.csv'
 CIGALE_parameters_normal_2 = {"module_list":module_list_normal,
                     "path_deep" : path_deep,
                     "file_store":file_store_normal_2,
@@ -207,14 +209,100 @@ SED_statistical_analysis.plot_result(CIGALE_parameters_normal_2,
                                      line_dict_fit = fit_jorge_2 ,
                                      title = "Normal jorge 2")
 
+def plot_best_SED(CIGALE_parameters,obs):
+    
+    
+    results_read = pd.read_csv(CIGALE_parameters["file_store"])
+    param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+    parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+    db_filters = Database()
+    filters = [db_filters.get_filter(name = band) for band in obs["bands"]]
+    wave_to_plot = [filtr.pivot_wavelength for filtr in filters]
+    warehouse = SedWarehouse(nocache = module_list)
+    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)
+    
+    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters)
+    target_photo, target_lines, = targ_covar[0:2]
+    target_spectro, covar_photo = targ_covar[2:4]
+    covar_spectro, covar_lines = targ_covar[4:6]
+    constants = SED_statistical_analysis.scale_factor_pre_computation(target_photo ,
+                                                                     covar_photo,
+                                                                     target_spectro,
+                                                                     covar_spectro,
+                                                                     CIGALE_parameters["mode"])
+    weight_spectro = 1
+    SED_photo = SED[0]
+    SED_spectro = SED[1]
+    SED_lines = SED[2]
+    constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
+    scaled_photo = constant*SED_photo
+    scaled_spectro = constant*SED_spectro
+    scaled_lines = constant*SED_lines
+    
+    yerr = obs['photometry_err']*1.96
+    plt.errorbar(x=wave_to_plot,y=obs['photometry_fluxes'],yerr=yerr)
+    plt.plot(wave_to_plot,scaled_photo)
+    plt.xscale("log")
+    print(np.sum(((scaled_photo-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
+    return None
+plot_best_SED(CIGALE_parameters_normal,galaxy_obs)
+plot_best_SED(CIGALE_parameters_normal,galaxy_obs)
 
-import pandas as pd
-results_read = pd.read_csv(CIGALE_parameters_normal["file_store"])
-A = results_read[results_read["MAP"]==1]
-B = A.iloc[0].to_dict()
-param_frame = B
-modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
-parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
-from pcigale.warehouse import SedWarehouse
-warehouse = SedWarehouse(nocache = module_list)
-SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)
+
+bands_jorge = ["best."+band for band in bands]
+pred_jorge = [galaxy_targ[band] for band in bands_jorge]
+
+def plot_jorge(obs,pred_jorge):
+    db_filters = Database()
+    filters = [db_filters.get_filter(name = band) for band in obs["bands"]]
+    wave_to_plot = [filtr.pivot_wavelength for filtr in filters]
+    yerr = obs['photometry_err']*1.96
+    plt.errorbar(x=wave_to_plot,y=obs['photometry_fluxes'],yerr=yerr)
+    plt.plot(wave_to_plot,pred_jorge)
+    plt.xscale("log")
+    print(np.sum(((pred_jorge-obs['photometry_fluxes'])/obs['photometry_err'])**2))
+    return None
+
+plot_jorge(galaxy_obs,pred_jorge)
+print(np.sum(((pred_jorge-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
+print(np.sum(((pred_jorge-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
+
+
+def plot_jorge_2(obs,params_jorge):
+    results_read = pd.read_csv(CIGALE_parameters["file_store"])
+    param_frame = params_jorge
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+    parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+    db_filters = Database()
+    filters = [db_filters.get_filter(name = band) for band in obs["bands"]]
+    wave_to_plot = [filtr.pivot_wavelength for filtr in filters]
+    warehouse = SedWarehouse(nocache = module_list)
+    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)
+    
+    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters)
+    target_photo, target_lines, = targ_covar[0:2]
+    target_spectro, covar_photo = targ_covar[2:4]
+    covar_spectro, covar_lines = targ_covar[4:6]
+    constants = SED_statistical_analysis.scale_factor_pre_computation(target_photo ,
+                                                                     covar_photo,
+                                                                     target_spectro,
+                                                                     covar_spectro,
+                                                                     CIGALE_parameters["mode"])
+    weight_spectro = 1
+    SED_photo = SED[0]
+    SED_spectro = SED[1]
+    SED_lines = SED[2]
+    constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
+    scaled_photo = constant*SED_photo
+    scaled_spectro = constant*SED_spectro
+    scaled_lines = constant*SED_lines
+    
+    yerr = obs['photometry_err']*1.96
+    plt.errorbar(x=wave_to_plot,y=obs['photometry_fluxes'],yerr=yerr)
+    plt.plot(wave_to_plot,scaled_photo)
+    plt.xscale("log")
+    print(np.sum(((scaled_photo-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
+    return None
+params= pd.read_csv(CIGALE_parameters["file_store"]).keys()[0:-2]
+param_jorge = ["best."+param for param in params]
