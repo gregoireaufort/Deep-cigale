@@ -247,7 +247,7 @@ def plot_best_SED(CIGALE_parameters,obs):
     print(np.sum(((scaled_photo-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
     return None
 plot_best_SED(CIGALE_parameters_normal,galaxy_obs)
-plot_best_SED(CIGALE_parameters_normal,galaxy_obs)
+
 
 
 bands_jorge = ["best."+band for band in bands]
@@ -265,22 +265,19 @@ def plot_jorge(obs,pred_jorge):
     return None
 
 plot_jorge(galaxy_obs,pred_jorge)
-print(np.sum(((pred_jorge-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
-print(np.sum(((pred_jorge-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
 
 
 def plot_jorge_2(obs,params_jorge):
-    results_read = pd.read_csv(CIGALE_parameters["file_store"])
     param_frame = params_jorge
-    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters_normal['module_list']]
     parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
     db_filters = Database()
     filters = [db_filters.get_filter(name = band) for band in obs["bands"]]
     wave_to_plot = [filtr.pivot_wavelength for filtr in filters]
     warehouse = SedWarehouse(nocache = module_list)
-    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)
+    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters_normal,warehouse)
     
-    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters)
+    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters_normal)
     target_photo, target_lines, = targ_covar[0:2]
     target_spectro, covar_photo = targ_covar[2:4]
     covar_spectro, covar_lines = targ_covar[4:6]
@@ -288,7 +285,7 @@ def plot_jorge_2(obs,params_jorge):
                                                                      covar_photo,
                                                                      target_spectro,
                                                                      covar_spectro,
-                                                                     CIGALE_parameters["mode"])
+                                                                     CIGALE_parameters_normal["mode"])
     weight_spectro = 1
     SED_photo = SED[0]
     SED_spectro = SED[1]
@@ -304,5 +301,25 @@ def plot_jorge_2(obs,params_jorge):
     plt.xscale("log")
     print(np.sum(((scaled_photo-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
     return None
-params= pd.read_csv(CIGALE_parameters["file_store"]).keys()[0:-2]
-param_jorge = ["best."+param for param in params]
+# params= pd.read_csv(CIGALE_parameters["file_store"]).keys()[0:-2]
+
+
+# indices_params = np.where(["best.sfh" in name for name in galaxy_targ.array.dtype.names])
+# param_jorge = [galaxy_targ.array.dtype.names[idx] for idx in indices_params[0]][0:6]
+
+
+
+results_read = pd.read_csv(CIGALE_parameters["file_store"])
+param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
+params_jorge = param_frame.copy()
+params_jorge["tau_main"] = galaxy_targ["best.sfh.tau_main"]
+params_jorge["age_burst"] = galaxy_targ["best.sfh.age_burst"]
+params_jorge["age_main"] = galaxy_targ["best.sfh.age_main"]
+params_jorge["f_burst"] = galaxy_targ["best.sfh.f_burst"]
+params_jorge["tau_burst"] = galaxy_targ["best.sfh.tau_burst"]
+params_jorge["qpah"] = galaxy_targ["best.dust.qpah"]
+params_jorge["alpha"] = galaxy_targ["best.dust.alpha"]
+params_jorge["gamma"] = galaxy_targ["best.dust.gamma"]
+params_jorge["umin"] = galaxy_targ["best.dust.umin"]
+
+plot_jorge_2(galaxy_obs,params_jorge)
