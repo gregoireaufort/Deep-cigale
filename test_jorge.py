@@ -32,7 +32,8 @@ fit_jorge = {"tau_main" : galaxy_targ["best.sfh.tau_main"],
                 'age_main':galaxy_targ["best.sfh.age_main"],
                   'tau_burst':galaxy_targ["best.sfh.tau_burst"],
                   'f_burst':galaxy_targ["best.sfh.f_burst"],
-                  'age_burst':galaxy_targ["best.sfh.age_burst"]}
+                  'age_burst':galaxy_targ["best.sfh.age_burst"],
+                  'E_BV_lines':galaxy_targ["best.attenuation.E_BV_lines"]}
 
 
 galaxy_obs = SED_statistical_analysis.read_galaxy_fits("observations.fits", 
@@ -52,12 +53,12 @@ module_parameters_to_fit = {'tau_main': {"type":"unif","min":1500,"max" :3000},
             'tau_burst':{"type":"unif","min":100,"max" :10000},
             'f_burst': {"type":"unif","min":0,"max" :0.2},
             'age_burst': {"type":"log","min":1,"max" :2},
+            'E_BV_lines' : {"type":"unif","min":0,"max" :2},
     
 }
 
 module_parameters_discrete = {'sfr_A' : [1.],
                              'normalise' : [True],
-                             'E_BV_lines' : [0.1],
                              'E_BV_factor' :  [0.44],
                              'uv_bump_wavelength' : [217.5],
                              'uv_bump_width' :[35.0],
