@@ -89,6 +89,10 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     width = CIGALE_parameters["nebular"]["lines_width"]
     wave = observed_galaxy["spectroscopy_wavelength"]
     err = observed_galaxy["spectroscopy_err"]**2
+    lim_wave, lim_err = limit_spec(wave,
+                                    err,
+                                    CIGALE_parameters['wavelength_limits']["min"],
+                                    CIGALE_parameters['wavelength_limits']["max"])
     covar_lines = 0*np.eye(2)
     if "lines" in CIGALE_parameters["mode"]:
         limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
@@ -99,8 +103,9 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
         err =  np.setdiff1d(err,err_to_remove)
         wave = np.setdiff1d(wave,wave_to_remove)
 
-    _,covar_continuum = binning_variances(wave,err, CIGALE_parameters["n_bins"])
+    _,covar_continuum = binning_variances(lim_wave, lim_err, CIGALE_parameters["n_bins"])
     return np.diag(covar_lines), np.diag(covar_continuum)
+
 
 def var_trapz(var,wave):
     seq_diff = (wave[1:] -wave[:-1])**2 #consecutive differences for the step
@@ -289,6 +294,7 @@ def extract_target(observed_galaxy,CIGALE_parameters):
         target_spectro = lim_target_spectro(observed_galaxy,
                                                  CIGALE_parameters)
         # self.target_lines = extract_lines(gal,wave,spec) # rewrite
+        target_lines = None
         covar_lines,covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
     else : 
         target_spectro, covar_spectro = None, None
@@ -447,7 +453,7 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
     
     spectro = Table.read(spectro_file)
     spectro_flux = np.array(spectro["Fnu"])
-    spectro_err = np.array(0.5*spectro_flux)
+    spectro_err = np.array(0.1*spectro_flux)
     spectro_wavelength = np.array(spectro["wavelength"])
     observed_galaxy  = {"spectroscopy_wavelength":spectro_wavelength,
                         "spectroscopy_fluxes":spectro_flux,

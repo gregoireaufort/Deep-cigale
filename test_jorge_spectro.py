@@ -53,13 +53,14 @@ module_parameters_to_fit = {'tau_main': {"type":"unif","min":1500,"max" :3000},
             'age_main': {"type":"unif","min":1000,"max" :10000},
             'tau_burst':{"type":"unif","min":100,"max" :10000},
             'f_burst': {"type":"unif","min":0,"max" :0.2},
-            'age_burst': {"type":"log","min":1,"max" :2},
-            'E_BV_lines' : {"type":"unif","min":0,"max" :2},
+            'age_burst': {"type":"unif","min":10,"max" :100},
+            #'E_BV_lines' : {"type":"unif","min":0,"max" :2},
     
 }
 
 module_parameters_discrete = {'sfr_A' : [1.],
                              'normalise' : [True],
+                             'E_BV_lines':[galaxy_targ["best.attenuation.E_BV_lines"]],
                              'E_BV_factor' :  [0.44],
                              'uv_bump_wavelength' : [217.5],
                              'uv_bump_width' :[35.0],
@@ -69,12 +70,12 @@ module_parameters_discrete = {'sfr_A' : [1.],
                              'Rv' : [3.1],
                              'imf' : [1],
                              'metallicity' : [0.02],
-                             'qpah' : [0.47, 1.12, 1.77, 2.5],
-                             'umin' : [5.0, 10.0, 25.0],
+                             'qpah' : [galaxy_targ["best.dust.qpah"]],
+                             'umin' : [galaxy_targ["best.dust.umin"]],
                              'alpha' : [2],
                              'gamma' : [0.02],
                              'separation_age': [10],
-                             'logU' :[-3.5, -2.5, -1.5],
+                             'logU' :[galaxy_targ["best.nebular.logU"]],
                              'f_esc': [0.0],
                              'f_dust' : [0.0],
                              'lines_width' :[300.0],
@@ -91,7 +92,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "deep_modules":deep_modules,
                     "module_parameters_to_fit":module_parameters_to_fit,
                     "module_parameters_discrete":module_parameters_discrete,
-                    "n_bins":10,
+                    "n_bins":100,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
                     "bands" :bands,
@@ -218,3 +219,165 @@ CIGALE_parameters_normal = {"module_list":module_list_normal,
                     "mode" : ["spectro"],
                     "n_jobs" : 15}
 result_normal = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters_normal, TAMIS_parameters)
+
+
+wave = galaxy_obs["spectroscopy_wavelength"]
+err = galaxy_obs["spectroscopy_err"]**2
+lim_wave, lim_err = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_err"],
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+
+_, lim_flux = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_fluxes"],
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+
+
+n_bins = 10
+
+yerr =lim_err *1.96
+plt.plot(lim_wave,lim_flux)
+plt.fill_between(lim_wave,lim_flux - yerr ,lim_flux + yerr,alpha = 0.5)
+plt.yscale("log")
+
+
+bin_wave , bin_flux = SED_statistical_analysis.binning_flux(lim_wave, lim_flux, n_bins)
+bin_wave,bin_err = SED_statistical_analysis.binning_variances(lim_wave, lim_err**2, n_bins)
+
+
+yerr =lim_err *1.96
+plt.plot(lim_wave,lim_flux)
+plt.plot(galaxy_obs["spectroscopy_wavelength"],galaxy_obs["spectroscopy_fluxes"],)
+plt.fill_between(lim_wave,lim_flux - yerr ,lim_flux + yerr,alpha = 0.5)
+plt.errorbar(x=bin_wave,y=bin_flux,yerr=1.96*np.sqrt(bin_err), color = "red")
+plt.yscale("log")
+plt.xscale("log")
+
+
+def plot_best_SED(CIGALE_parameters,obs):
+    
+    
+    results_read = pd.read_csv(CIGALE_parameters["file_store"])
+    param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
+    print(param_frame)
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+    parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+    db_filters = Database()
+    filters = [db_filters.get_filter(name = band) for band in obs["bands"]]
+    lim_wave, lim_err = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_err"],
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+    warehouse = SedWarehouse(nocache = module_list)
+    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)
+    
+    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters)
+    target_photo, target_lines, = targ_covar[0:2]
+    target_spectro, covar_photo = targ_covar[2:4]
+    covar_spectro, covar_lines = targ_covar[4:6]
+    constants = SED_statistical_analysis.scale_factor_pre_computation(target_photo ,
+                                                                     covar_photo,
+                                                                     target_spectro,
+                                                                     covar_spectro,
+                                                                     CIGALE_parameters["mode"])
+    _, lim_flux = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_fluxes"],
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+    wave_to_plot , bin_flux = SED_statistical_analysis.binning_flux(lim_wave, lim_flux, n_bins)
+
+    bin_wave,bin_err = SED_statistical_analysis.binning_variances(lim_wave, lim_err**2, n_bins)
+
+    weight_spectro = 1
+    SED_photo = SED[0]
+    SED_spectro = SED[1]
+    SED_lines = SED[2]
+    constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
+    scaled_photo = constant*SED_photo
+    scaled_spectro = constant*SED_spectro
+    scaled_lines = constant*SED_lines
+    
+    yerr = np.array(np.sqrt(bin_err))*1.96
+    plt.errorbar(x=wave_to_plot,y=bin_flux,yerr=yerr, color = "red")
+    plt.plot(wave_to_plot,scaled_spectro)
+    plt.xscale("log")
+    return None
+plot_best_SED(CIGALE_parameters_normal,galaxy_obs)
+
+
+
+
+
+def plot_jorge_2(obs,params_jorge):
+    param_frame = params_jorge
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters_normal['module_list']]
+    parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+    db_filters = Database()
+    filters = [db_filters.get_filter(name = band) for band in obs["bands"]]
+    wave_to_plot = [filtr.pivot_wavelength for filtr in filters]
+    warehouse = SedWarehouse(nocache = module_list)
+    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters_normal,warehouse)
+    
+    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters_normal)
+    target_photo, target_lines, = targ_covar[0:2]
+    target_spectro, covar_photo = targ_covar[2:4]
+    covar_spectro, covar_lines = targ_covar[4:6]
+    constants = SED_statistical_analysis.scale_factor_pre_computation(target_photo ,
+                                                                     covar_photo,
+                                                                     target_spectro,
+                                                                     covar_spectro,
+                                                                     CIGALE_parameters_normal["mode"])
+    _, lim_flux = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_fluxes"],
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+    wave_to_plot , bin_flux = SED_statistical_analysis.binning_flux(lim_wave, lim_flux, n_bins)
+
+    bin_wave,bin_err = SED_statistical_analysis.binning_variances(lim_wave, lim_err**2, n_bins)
+
+    weight_spectro = 1
+    SED_photo = SED[0]
+    SED_spectro = SED[1]
+    SED_lines = SED[2]
+    constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
+    scaled_photo = constant*SED_photo
+    scaled_spectro = constant*SED_spectro
+    scaled_lines = constant*SED_lines
+    weight_spectro = 1
+    SED_photo = SED[0]
+    SED_spectro = SED[1]
+    SED_lines = SED[2]
+    constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
+    scaled_photo = constant*SED_photo
+    scaled_spectro = constant*SED_spectro
+    scaled_lines = constant*SED_lines
+    
+    yerr = np.array(np.sqrt(bin_err))*1.96
+    plt.errorbar(x=wave_to_plot,y=bin_flux,yerr=yerr, color = "red")
+    plt.plot(wave_to_plot,scaled_spectro)
+    plt.xscale("log")
+    print(np.sumscaled_photo-galaxy_obs['photometry_fluxes'])/galaxy_obs['photometry_err'])**2))
+    return None
+# params= pd.read_csv(CIGALE_parameters["file_store"]).keys()[0:-2]
+
+
+# indices_params = np.where(["best.sfh" in name for name in galaxy_targ.array.dtype.names])
+# param_jorge = [galaxy_targ.array.dtype.names[idx] for idx in indices_params[0]][0:6]
+
+
+
+results_read = pd.read_csv(CIGALE_parameters_normal["file_store"])
+param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
+params_jorge = param_frame.copy()
+params_jorge["tau_main"] = galaxy_targ["best.sfh.tau_main"]
+params_jorge["age_burst"] = galaxy_targ["best.sfh.age_burst"]
+params_jorge["age_main"] = galaxy_targ["best.sfh.age_main"]
+params_jorge["f_burst"] = galaxy_targ["best.sfh.f_burst"]
+params_jorge["tau_burst"] = galaxy_targ["best.sfh.tau_burst"]
+params_jorge["qpah"] = galaxy_targ["best.dust.qpah"]
+params_jorge["alpha"] = galaxy_targ["best.dust.alpha"]
+params_jorge["gamma"] = galaxy_targ["best.dust.gamma"]
+params_jorge["umin"] = galaxy_targ["best.dust.umin"]
+
+plot_jorge_2(galaxy_obs,params_jorge)

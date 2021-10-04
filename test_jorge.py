@@ -167,7 +167,8 @@ fit_jorge_2 = {"tau_main" : galaxy_targ_2["best.sfh.tau_main"],
                 'age_main':galaxy_targ_2["best.sfh.age_main"],
                   'tau_burst':galaxy_targ_2["best.sfh.tau_burst"],
                   'f_burst':galaxy_targ_2["best.sfh.f_burst"],
-                  'age_burst':galaxy_targ_2["best.sfh.age_burst"]}
+                  'age_burst':galaxy_targ_2["best.sfh.age_burst"],
+                  'E_BV_lines':galaxy_targ_2["best.attenuation.E_BV_lines"]}
 
 
 galaxy_obs_2= SED_statistical_analysis.read_galaxy_fits("observations.fits", 
@@ -198,7 +199,7 @@ CIGALE_parameters_normal_2 = {"module_list":module_list_normal,
                     "nebular" :nebular_params,
                     "bands" :bands,
                     "mode" : ["photo"],
-                    "n_jobs" : 10}
+                    "n_jobs" : 16}
 
 result_normal_2 = SED_statistical_analysis.fit(galaxy_obs_2,
                                       CIGALE_parameters_normal_2, TAMIS_parameters)
