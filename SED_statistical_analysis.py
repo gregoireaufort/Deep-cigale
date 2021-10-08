@@ -64,7 +64,7 @@ def extract_lines(gal,wave,spec):
     new_wave = np.setdiff1d(wave,wave_to_remove)
     return integrated_lines, continuum, new_wave
 
-def binning_flux(wavelength, spectrum, n_bins):
+def binning_flux(wavelength, spectrum, n_bins,L_min,L_max):
     """Bins the spectroscopy and the associated uncertainties.
         We assume no correlation and constant band width
     
@@ -77,22 +77,24 @@ def binning_flux(wavelength, spectrum, n_bins):
         wave_binned
         spec_binned
     """
-    bins = np.logspace(start = np.log10(wavelength[0]),
-                       stop = np.log10(wavelength[-1]-1),
+    bins = np.linspace(start = L_min,
+                       stop = L_max,
                        num = n_bins)
     idx = np.digitize(wavelength, bins)
-    spec_binned = [np.mean(spectrum[idx == i]) for i in range(1,n_bins+1)]
-    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins+1)]
+    spec_binned = [np.mean(spectrum[idx == i]) for i in range(1,n_bins)]
+    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins)]
     return wave_binned,spec_binned
 
 def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     width = CIGALE_parameters["nebular"]["lines_width"]
     wave = observed_galaxy["spectroscopy_wavelength"]
     err = observed_galaxy["spectroscopy_err"]**2
+    L_min =  CIGALE_parameters['wavelength_limits']["min"]
+    L_max =CIGALE_parameters['wavelength_limits']["max"]
     lim_wave, lim_err = limit_spec(wave,
                                     err,
-                                    CIGALE_parameters['wavelength_limits']["min"],
-                                    CIGALE_parameters['wavelength_limits']["max"])
+                                    L_min,
+                                    L_max)
     covar_lines = 0*np.eye(2)
     if "lines" in CIGALE_parameters["mode"]:
         limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
@@ -103,7 +105,11 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
         err =  np.setdiff1d(err,err_to_remove)
         wave = np.setdiff1d(wave,wave_to_remove)
 
-    _,covar_continuum = binning_variances(lim_wave, lim_err, CIGALE_parameters["n_bins"])
+    _,covar_continuum = binning_variances(lim_wave, 
+                                          lim_err, 
+                                          CIGALE_parameters["n_bins"],
+                                          L_min,
+                                          L_max)
     return np.diag(covar_lines), np.diag(covar_continuum)
 
 
@@ -112,7 +118,7 @@ def var_trapz(var,wave):
     sum_middle = seq_diff[:-1] + seq_diff[1:] # consecutive sums of step
     res = seq_diff[0]*var[0] + seq_diff[-1]*var[-1] + np.sum(sum_middle*var[1:-1])
     return 0.25*res
-def binning_variances(wavelength, variances, n_bins):
+def binning_variances(wavelength, variances, n_bins,L_min,L_max):
     """Bins the spectroscopy and the associated uncertainties.
     We assume no correlation and constant bandwidth
     
@@ -125,12 +131,12 @@ def binning_variances(wavelength, variances, n_bins):
     wave_binned
     spec_binned
     """
-    bins = np.logspace(start = np.log10(wavelength[0]),
-                           stop = np.log10(wavelength[-1]-1),
+    bins = np.linspace(start = L_min,
+                           stop = L_max,
                            num = n_bins)
     idx = np.digitize(wavelength, bins)
-    variances_binned = [np.sum(variances[idx == i])/(np.sum(idx==i)**2) for i in range(1,n_bins+1)]
-    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins+1)]
+    variances_binned = [np.sum(variances[idx == i])/(np.sum(idx==i)**2) for i in range(1,n_bins)]
+    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins)]
     return wave_binned,variances_binned
 
 def sample_to_cigale_input(sample,CIGALE_parameters = None):
@@ -187,12 +193,17 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
         photo =np.ones(2)
     if "spectro" in CIGALE_parameters["mode"]:
         wavelength,spectrum = SED.wavelength_grid, SED.fnu
+        L_min =  CIGALE_parameters['wavelength_limits']["min"]
+        L_max =CIGALE_parameters['wavelength_limits']["max"]
         lim_wave, lim_spec = limit_spec(wavelength,
                                         spectrum,
-                                        CIGALE_parameters['wavelength_limits']["min"],
-                                        CIGALE_parameters['wavelength_limits']["max"])
+                                        L_min,
+                                        L_max)
         # lines, lim_spec, lim_wave  = extract_lines(SED,wavelength,spectrum)
-        _,spectro = binning_flux(lim_wave,lim_spec,CIGALE_parameters['n_bins'])
+        _,spectro = binning_flux(lim_wave,
+                                 lim_spec,CIGALE_parameters['n_bins'],
+                                  L_min,
+                                  L_max)
     else:
         spectro, lines = np.ones(2),np.ones(2)
     lines = np.ones(2)
@@ -275,11 +286,16 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
 def lim_target_spectro(observed_galaxy,CIGALE_parameters):
     wave =observed_galaxy["spectroscopy_wavelength"]
     spectrum = observed_galaxy["spectroscopy_fluxes"]
+    L_min = CIGALE_parameters['wavelength_limits']["min"]
+    L_max = CIGALE_parameters['wavelength_limits']["max"]
     lim_wave, lim_spec = limit_spec(wave,
                                     spectrum,
-                                    CIGALE_parameters['wavelength_limits']["min"],
-                                    CIGALE_parameters['wavelength_limits']["max"])
-    _,binned_spec = binning_flux(lim_wave,lim_spec,CIGALE_parameters['n_bins'])
+                                    L_min,
+                                    L_max)
+    _,binned_spec = binning_flux(lim_wave,
+                                 lim_spec,CIGALE_parameters['n_bins'],
+                                 L_min,
+                                 L_max)
     return binned_spec
 
 
@@ -533,3 +549,32 @@ def analyse_results(CIGALE_parameters):
                      }
     return res
 
+
+def plot_de_secours(CIGALE_parameters, line_dict_fit = None, title = None):
+
+    results = pd.read_csv(CIGALE_parameters["file_store"])
+    to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
+    to_hist = []
+    for param in CIGALE_parameters["module_parameters_discrete"]:
+        if len(results[param].unique()) > 1:
+            to_hist.append(param)
+    to_plot_hist = results[to_hist]
+    n_rows = np.int(np.sqrt(len(to_plot_hist.columns))) + 1
+    n_cols = np.int(np.sqrt(len(to_plot_hist.columns))) + 1
+    fig,axes = plt.subplots(nrows = n_rows, ncols = n_cols)
+    for i, column in enumerate(to_plot_hist.columns):
+        #plt.figure()
+        sns.histplot(x=to_plot_hist[column].astype(str), 
+                     weights =results["weights"], 
+                     kde= False,
+                     ax = axes[i//n_cols,i%n_cols])
+        #plt.show()
+    for column in to_plot.columns:
+        #plt.figure()
+        sns.kdeplot(to_plot[column], 
+                     weights =results["weights"])
+        plt.axvline(line_dict_fit[column])
+        plt.show()
+    
+    if title :
+        plt.suptitle(title)

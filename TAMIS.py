@@ -13,7 +13,7 @@ from utils import compute_ESS,compute_KL, compute_perplexity
 import scipy.stats as stats
 from GMM import GMM_fit, Mixture_gaussian
 import matplotlib.pyplot as plt
-from celluloid import Camera
+#from celluloid import Camera
 import seaborn as sns
 from sklearn.utils import resample
 import pandas as pd
@@ -23,31 +23,31 @@ from scipy.special import logsumexp
 
 
 
-def plot_convergence_2(TAMIS, iters = None, lim = 50, target_plot = None, title =None):
-    camera = Camera(plt.figure())
-    if not iters:
-        iters= range(TAMIS.iteration)
-    if not title:
-        title = "test.gif"
-    for iteration in iters:
-        means = TAMIS.theta_total[iteration].mean
-        covariances = TAMIS.theta_total[iteration].variance
-        weights_prop = TAMIS.theta_total[iteration].proportions
-        dots = Mixture_gaussian.rvs(size = 100, 
-                             means = means,
-                             covs = covariances,
-                             weights = weights_prop)
-        # plt.figure()
-        if target_plot:
-            target_plot()
-        plt.scatter(dots[:,0], dots[:,1], s= 1, color = "blue")
-        camera.snap()
-        plt.xlim([-lim,lim])
-        plt.ylim([-lim,lim])
-        # plt.title(str(iteration))
-        # plt.show()
-        anim = camera.animate(blit=True)
-        anim.save(title)
+# def plot_convergence_2(TAMIS, iters = None, lim = 50, target_plot = None, title =None):
+#     camera = Camera(plt.figure())
+#     if not iters:
+#         iters= range(TAMIS.iteration)
+#     if not title:
+#         title = "test.gif"
+#     for iteration in iters:
+#         means = TAMIS.theta_total[iteration].mean
+#         covariances = TAMIS.theta_total[iteration].variance
+#         weights_prop = TAMIS.theta_total[iteration].proportions
+#         dots = Mixture_gaussian.rvs(size = 100, 
+#                              means = means,
+#                              covs = covariances,
+#                              weights = weights_prop)
+#         # plt.figure()
+#         if target_plot:
+#             target_plot()
+#         plt.scatter(dots[:,0], dots[:,1], s= 1, color = "blue")
+#         camera.snap()
+#         plt.xlim([-lim,lim])
+#         plt.ylim([-lim,lim])
+#         # plt.title(str(iteration))
+#         # plt.show()
+#         anim = camera.animate(blit=True)
+#         anim.save(title)
             
             
 def adapt_beta(weights, alpha):
