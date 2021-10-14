@@ -7,8 +7,10 @@ Created on Tue May 19 16:17:09 2020
 import pandas as pd
 import  joblib
 import numpy as np
-from copy import copy
-def Deep_cloudy(params_cloudy):
+
+
+
+def Deep_cloudy(params_cloudy,path_cigale):
     """Simulates part of Cloudy's lines output through a deep neural network
     
     Input:
@@ -21,18 +23,18 @@ def Deep_cloudy(params_cloudy):
     
     X = params_cloudy.copy()
     X['deep_nebular.Age'] /=1e6
-    scaler = joblib.load("/home/aufort/Desktop/cigale-master/pcigale/data/X_scaling.pkl")
+    scaler = joblib.load(path_cigale+"X_scaling.pkl")
     X= scaler.transform(X)
     
-    pca = joblib.load("/home/aufort/Desktop/cigale-master/pcigale/data/pca_trained.pkl")
-    ANN = joblib.load("/home/aufort/Desktop/cigale-master/pcigale/data/ANN/13_04_27_06.pkl")
+    pca = joblib.load(path_cigale+"pca_trained.pkl")
+    ANN = joblib.load(path_cigale+"ANN/13_04_27_06.pkl")
     y_pred = ANN.predict(X)
-    ANN_hbeta = joblib.load("/home/aufort/Desktop/cigale-master/pcigale/data/ANN/ANN_hbeta_256.pkl")
+    ANN_hbeta = joblib.load(path_cigale+"data/ANN/ANN_hbeta_256.pkl")
     Hb = np.exp(ANN_hbeta.predict(X))
     norm_lines = pca.inverse_transform(y_pred)
         
     line_names = []
-    with open('/home/aufort/Desktop/cigale-master/pcigale/data/list_lines.txt', 'r') as filehandle:
+    with open(path_cigale+'list_lines.txt', 'r') as filehandle:
         for line in filehandle:
             currentPlace = line[:-1]
             line_names.append(currentPlace)
@@ -48,8 +50,9 @@ def Deep_cloudy(params_cloudy):
 
 
 if __name__ == "__main__":
+    path_data = "/home/aufort/Desktop/Deep-cigale/pcigale/data/"
     params_cloudy = pd.read_csv("params_cloudy.csv",index_col = 0)
-    pred_lines = Deep_cloudy(params_cloudy)
+    pred_lines = Deep_cloudy(params_cloudy,path_data)
     pred_lines.to_csv("lines.csv")
     
     

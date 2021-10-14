@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import scipy.constants as cst
 
-from pcigale.data import deep_pyneb, deep_cloudy
+from pcigale.data import  deep_cloudy #,deep_pyneb
 from . import SedModule
 
 class NebularEmission(SedModule):
@@ -34,27 +34,32 @@ class NebularEmission(SedModule):
                        "deep_nebular.log_N_O",
                        "deep_nebular.HbFrac"]
     params_nebular = params[names_deep_neb]
-    all_lines = deep_cloudy.Deep_cloudy(params_nebular) /1e7 #Erg/S to W
+    path_cloudy =os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/data/'
+
+    all_lines = deep_cloudy.Deep_cloudy(params_nebular,path_cloudy )/(4*np.pi*(3.086*10**21)**2) #F = L/ 4*pi*D^2, D = 3.086*10*21 cm, 
+    all_lines /= 1e7 #Erg/S to W
     n = params_nebular.shape[0]
-    pyneb = deep_pyneb.deep_continuum()
-    wavelength_cont = np.array([3500, 3600, 3700, 3800, 3900]) #To choose, not necessarily in a file, in Angstrom, cf PyNeb doc
-    cont_unscaled = pyneb.compute_continuum(params_nebular,wavelength_cont)
-    #Need to scale cont by Hbeta in lines
-    cont = cont_unscaled.multiply(all_lines['H__1_486133A'],axis = 0)
-    del cont_unscaled
+    #-------------------- Continuum part, to be added later -------#
+    # pyneb = deep_pyneb.deep_continuum()
+    # wavelength_cont = np.array([3500, 3600, 3700, 3800, 3900]) #To choose, not necessarily in a file, in Angstrom, cf PyNeb doc
+    # cont_unscaled = pyneb.compute_continuum(params_nebular,wavelength_cont)
+    # #Need to scale cont by Hbeta in lines
+    # cont = cont_unscaled.multiply(all_lines['H__1_486133A'],axis = 0)
+    # del cont_unscaled
+    #-------------------------------------------------------------#
     path_wave = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/data/dict_wavelength_lines.csv'
     df_wavelength_lines =  pd.read_csv(path_wave) #depends on the Cloudy training set
     
     lines = all_lines[df_wavelength_lines['name']]
-    wavelength_lines = df_wavelength_lines['wavelength']/1000 # A to nm +  reading error when making dict_wavelength_lines
+    wavelength_lines = df_wavelength_lines['wavelength']
     datadb_pyneb = dict()
     datadb_cloudy = dict()
     for i in range(n):
         datadb_cloudy[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : lines.iloc[i,:],
                                                                  'names' : lines.columns,
                                                                  'wave' : wavelength_lines}
-        datadb_pyneb[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : cont.iloc[i,:],
-                                                                 'wave' : wavelength_cont/10}
+        # datadb_pyneb[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : cont.iloc[i,:],
+        #                                                          'wave' : wavelength_cont/10}
     
     
     parameter_list = OrderedDict([
@@ -193,7 +198,7 @@ class NebularEmission(SedModule):
             index = tuple(np.around(params_NN,4))
             
             self.lines = self.datadb_cloudy[index]
-            cont= self.datadb_pyneb[index]
+            #cont= self.datadb_pyneb[index]
 
             linesdict = dict(zip(self.lines["names"],
                                           zip(self.lines["wave"],
@@ -235,10 +240,10 @@ class NebularEmission(SedModule):
             sed.add_contribution('nebular.lines_young', self.lines["wave"],
                                  self.lines["lumin"] * NLy_young * self.corr)
 
-            sed.add_contribution('nebular.continuum_old', cont["wave"],
-                                 cont["lumin"] * NLy_old * self.corr)
-            sed.add_contribution('nebular.continuum_young', cont["wave"],
-                                 cont["lumin"] * NLy_young * self.corr)
+            # sed.add_contribution('nebular.continuum_old', cont["wave"],
+            #                      cont["lumin"] * NLy_old * self.corr)
+            # sed.add_contribution('nebular.continuum_young', cont["wave"],
+            #                      cont["lumin"] * NLy_young * self.corr)
 
 
 # SedModule to be returned by get_module
