@@ -64,9 +64,14 @@ def extract_lines(gal,wave,spec):
     new_wave = np.setdiff1d(wave,wave_to_remove)
     return integrated_lines, continuum, new_wave
 
+
+def window_averaging(wavelength,spectrum):
+     delta_lambda = wavelength[1:] - wavelength[:-1] 
+     mid_point =(spectrum[1:] + spectrum[:-1])/2
+     spec = np.average(mid_point,weights = delta_lambda)
+     return spec
 def binning_flux(wavelength, spectrum, n_bins,L_min,L_max):
-    """Bins the spectroscopy and the associated uncertainties.
-        We assume no correlation and constant band width
+    """Bins the spectroscopy
     
     Input : 
         wavelength - list, ordered wavelengths
@@ -78,12 +83,42 @@ def binning_flux(wavelength, spectrum, n_bins,L_min,L_max):
         spec_binned
     """
     bins = np.linspace(start = L_min,
-                       stop = L_max,
-                       num = n_bins)
+                           stop = L_max,
+                           num = n_bins+1)
     idx = np.digitize(wavelength, bins)
-    spec_binned = [np.mean(spectrum[idx == i]) for i in range(1,n_bins)]
-    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins)]
-    return wave_binned,spec_binned
+    spec_b = [window_averaging(wavelength[idx == i],spectrum[idx == i]) for i in range(1,n_bins +1)]
+    wave_b = [np.mean(wavelength[idx == i]) for i in range(1,n_bins +1)]
+    return wave_b,spec_b
+def var_trapz(wave,var):
+    """We assume no correlation """
+    seq_diff = (wave[1:] -wave[:-1]) #consecutive differences for the step
+    coeff = 1/(4*(wave[-1]-wave[0])**2)
+    sum_terms = np.sum(var[0:-1]*(seq_diff**2)) + np.sum(var[1:]*(seq_diff**2))
+    res = coeff * sum_terms
+    return res
+
+
+
+def binning_variances(wavelength, variances, n_bins,L_min,L_max):
+    """Bins the spectroscopy and the associated uncertainties.
+    We assume no correlation 
+    
+    Input : 
+    wavelength - list, ordered wavelengths
+    spectrum - np.array, observed fluxes at each wavelength
+    n_bins - integer, number of bins
+    
+    Output : 
+    wave_binned
+    spec_binned
+    """
+    bins = np.linspace(start = L_min,
+                           stop = L_max,
+                           num = n_bins+1)
+    idx = np.digitize(wavelength, bins)
+    variances_binned = [var_trapz(wavelength[idx == i],variances[idx == i]) for i in range(1,n_bins+1)]
+    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins+1)]
+    return wave_binned,variances_binned
 
 def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     width = CIGALE_parameters["nebular"]["lines_width"]
@@ -113,33 +148,9 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     return np.diag(covar_lines), np.diag(covar_continuum)
 
 
-def var_trapz(var,wave):
-    seq_diff = (wave[1:] -wave[:-1])**2 #consecutive differences for the step
-    sum_middle = seq_diff[:-1] + seq_diff[1:] # consecutive sums of step
-    res = seq_diff[0]*var[0] + seq_diff[-1]*var[-1] + np.sum(sum_middle*var[1:-1])
-    return 0.25*res
-def binning_variances(wavelength, variances, n_bins,L_min,L_max):
-    """Bins the spectroscopy and the associated uncertainties.
-    We assume no correlation and constant bandwidth
-    
-    Input : 
-    wavelength - list, ordered wavelengths
-    spectrum - np.array, observed fluxes at each wavelength
-    n_bins - integer, number of bins
-    
-    Output : 
-    wave_binned
-    spec_binned
-    """
-    bins = np.linspace(start = L_min,
-                           stop = L_max,
-                           num = n_bins)
-    idx = np.digitize(wavelength, bins)
-    variances_binned = [np.sum(variances[idx == i])/(np.sum(idx==i)**2) for i in range(1,n_bins)]
-    wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins)]
-    return wave_binned,variances_binned
-
-def sample_to_cigale_input(sample,CIGALE_parameters = None):
+def sample_to_cigale_input(sample,
+                           CIGALE_parameters = None,
+                           weights_discrete = None):
     """sample from the proposal
     
     Input : 
@@ -168,7 +179,8 @@ def sample_to_cigale_input(sample,CIGALE_parameters = None):
     discrete_parameters = CIGALE_parameters["module_parameters_discrete"]
     for name in discrete_parameters.keys():
         param_frame[name] = np.random.choice(discrete_parameters[name],
-                                             size = param_frame.shape[0])
+                                             size = param_frame.shape[0],
+                                             p = weights_discrete)
     modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
     parameter_list =[[{param:param_frame[param].iloc[i] for param in module_params} for module_params in modules_params] for i in range(param_frame.shape[0])] 
     

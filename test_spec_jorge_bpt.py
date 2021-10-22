@@ -200,7 +200,7 @@ line_dict_fit = {"log(tau_main)" : np.log10(B[0]["best.sfh.tau_main"]),
 
 
 module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'restframe_parameters','redshifting']
-file_store_normal = 'store_parameters_test_normal_spectro_bpt_correct.csv'
+file_store_normal = 'store_parameters_test_normal_spectro_bpt_correct_hr.csv'
 #NEED TO AUTOMATE THIS PART, USELESS TO SET UP
 var0 = [3]*dim_prior
 mean0 = 0
@@ -227,7 +227,7 @@ CIGALE_parameters_normal = {"module_list":module_list_normal,
                     "deep_modules":None,
                     "module_parameters_to_fit":module_parameters_to_fit,
                     "module_parameters_discrete":module_parameters_discrete,
-                    "n_bins":20,
+                    "n_bins":50,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
                     "bands" :bands,
@@ -236,6 +236,11 @@ CIGALE_parameters_normal = {"module_list":module_list_normal,
 result_normal = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters_normal, TAMIS_parameters)
 
 SED_statistical_analysis.plot_result(CIGALE_parameters_normal,
+                                      line_dict_fit = fit_jorge,
+                                      title = "CIGALE Jorge 1 spectro")
+
+
+SED_statistical_analysis.plot_de_secours(CIGALE_parameters_normal,
                                       line_dict_fit = fit_jorge,
                                       title = "CIGALE Jorge 1 spectro")
 # wave = galaxy_obs["spectroscopy_wavelength"]
@@ -277,7 +282,6 @@ def plot_best_SED(CIGALE_parameters,obs):
     
     results_read = pd.read_csv(CIGALE_parameters["file_store"])
     param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
-    print(param_frame)
     modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
     parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
     lim_wave, lim_err = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
@@ -325,8 +329,11 @@ def plot_best_SED(CIGALE_parameters,obs):
     plt.errorbar(x=wave_to_plot,y=bin_flux,yerr=yerr, color = "red")
     plt.plot(wave_to_plot,scaled_spectro)
     plt.xscale("log")
+    print(np.sum(((scaled_spectro-bin_flux)/bin_err)**2))
     return None
 plot_best_SED(CIGALE_parameters_normal,galaxy_obs)
+
+
 
 def plot_best_no_bins(CIGALE_parameters,obs):
     results_read = pd.read_csv(CIGALE_parameters["file_store"])
@@ -398,22 +405,38 @@ def plot_jorge_2(obs,params_jorge):
                                 galaxy_obs["spectroscopy_fluxes"],
                                 CIGALE_parameters['wavelength_limits']["min"],
                                 CIGALE_parameters['wavelength_limits']["max"])
-    wave_to_plot , bin_flux = SED_statistical_analysis.binning_flux(lim_wave, lim_flux, n_bins)
+    lim_wave, lim_err = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_err"],
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+    wave_to_plot , bin_flux = SED_statistical_analysis.binning_flux(lim_wave, lim_flux, n_bins,
+                                                                    CIGALE_parameters['wavelength_limits']["min"],
+                                                                    CIGALE_parameters['wavelength_limits']["max"])
 
-    bin_wave,bin_err = SED_statistical_analysis.binning_variances(lim_wave, lim_err**2, n_bins)
-
+    bin_wave,bin_err = SED_statistical_analysis.binning_variances(lim_wave, lim_err**2, n_bins,CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+    
     weight_spectro = 1
-    SED_photo = SED[0]
-    SED_spectro = SED[1]
-    SED_lines = SED[2]
+    #SED_photo = SED[0]
+    SED_spectro = SED.fnu
+    #SED_lines = SED[2]
     constant = galaxy_targ["best.sfh.integrated"]
-    scaled_photo = constant*SED_photo
+    #scaled_photo = constant*SED_photo
     scaled_spectro = constant*SED_spectro
-    scaled_lines = constant*SED_lines
-    yerr = np.array(np.sqrt(bin_err))*1.96
-    plt.errorbar(x=wave_to_plot,y=bin_flux,yerr=yerr, color = "red", alpha = 0.2)
-    plt.plot(wave_to_plot,scaled_spectro)
-    plt.xscale("log")
+    lim_wve,lim_spec= SED_statistical_analysis.limit_spec( SED.wavelength_grid,
+                                scaled_spectro,
+                                CIGALE_parameters['wavelength_limits']["min"],
+                                CIGALE_parameters['wavelength_limits']["max"])
+    _, bin_spec = SED_statistical_analysis.binning_flux(lim_wve, lim_spec, n_bins,
+                                                        CIGALE_parameters['wavelength_limits']["min"],
+                                                        CIGALE_parameters['wavelength_limits']["max"])
+    
+    #scaled_lines = constant*SED_lines
+    # yerr = np.array(np.sqrt(bin_err))*1.96
+    # plt.errorbar(x=wave_to_plot,y=bin_flux,yerr=yerr, color = "red", alpha = 0.2)
+    # plt.plot(wave_to_plot,scaled_spectro)
+    # plt.xscale("log")
+    print(np.sum(((np.array(bin_spec)-np.array(bin_flux))/bin_err)**2))
     return None
 # params= pd.read_csv(CIGALE_parameters["file_store"]).keys()[0:-2]
 
@@ -461,7 +484,6 @@ def plot_jorge_3(obs,params_jorge):
     plt.plot(lim_wave_SED,scaled_spectro)
     plt.plot(lim_wave,lim_flux)
     #plt.errorbar(lim_wave,lim_flux,yerr = yerr,color = "red",alpha = 0.2)
-    plt.xscale("log")
     #print(np.sum(((scaled_spectro-lim_flux)/lim_err)**2))
 
     return lim_flux, scaled_spectro , lim_wave, lim_wave_SED
@@ -639,6 +661,43 @@ plt.plot(spec_true[80])
 plt.plot(spec_simu[80])
 
 
+
+    
+diff_const = []
+spec_true=[]
+spec_simu = []
+covars = []
+lkhd = []
+for i in range(1,101):
+    n_bins = 2*i
+    CIGALE_parameters_normal["n_bins"] = n_bins
+    param_frame = params_jorge
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters_normal['module_list']]
+    parameter_list =[{param:params_jorge[param] for param in module_params} for module_params in modules_params]
+    warehouse = SedWarehouse(nocache = module_list)
+    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters_normal,warehouse)
+    targ_covar = SED_statistical_analysis.extract_target(galaxy_obs,CIGALE_parameters_normal)
+    target_photo, target_lines, = targ_covar[0:2]
+    target_spectro, covar_photo = targ_covar[2:4]
+    covar_spectro, covar_lines = targ_covar[4:6]
+    constants = SED_statistical_analysis.scale_factor_pre_computation(target_photo ,
+                                                                      covar_photo,
+                                                                      target_spectro,
+                                                                      covar_spectro,
+                                                                      CIGALE_parameters_normal["mode"])
+    _,covar = SED_statistical_analysis.compute_covar_spectro(galaxy_obs, CIGALE_parameters_normal) 
+    weight_spectro = 1
+    SED_photo = SED[0]
+    SED_spectro = SED[1]
+    SED_lines = SED[2]
+    constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
+    diff_const.append((constant -galaxy_targ["best.sfh.integrated"])/galaxy_targ["best.sfh.integrated"])
+    spec_true.append(target_spectro)
+    spec_simu.append(galaxy_targ["best.sfh.integrated"]*SED_spectro)
+    covars.append(np.mean(np.diag(covar)))
+    lkhd.append(np.sum(((target_spectro- galaxy_targ["best.sfh.integrated"]*SED_spectro)**2) / np.diag(covar)))
+    
+
 # plt.plot((spec_true[10] -spec_simu[10]) / spec_true[10])
 
 # plt.plot((spec_true[20] -spec_simu[20]) / spec_true[20])
@@ -652,6 +711,5 @@ plt.plot(spec_simu[80])
 
 # plt.plot(lkhd)
 # plt.yscale("log")
-
 
 
