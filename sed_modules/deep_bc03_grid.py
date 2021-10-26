@@ -27,7 +27,7 @@ from ..data import SimpleDatabase
 
 
 def deep_approx_BC03():
-    #try:
+    try:
         
         path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
         params_sfh = read_csv(path_data+'deep_sfhdelayed_parameters.csv',sep=" ")
@@ -65,6 +65,8 @@ def deep_approx_BC03():
         						  'n_ly' : rescaled[i,-1] }
             
         return datadb
+    except : 
+        pass
 class BC03(SedModule):
     """Bruzual and Charlot (2003) stellar emission module
 
