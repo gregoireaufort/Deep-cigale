@@ -31,7 +31,7 @@ def deep_approx_BC03():
         
         path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
         params_sfh = read_csv(path_data+'deep_sfhdelayed_parameters.csv',sep=" ")
-        params_bc03 = read_csv(path_data+'deep_bc03_pca_norm_parameters.csv',sep=" ")
+        params_bc03 = read_csv(path_data+'deep_bc03_grid_parameters.csv',sep=" ")
         params = params_sfh.merge(params_bc03, how = 'cross')
         model = tf.keras.models.load_model(path_data+'ANN/NN_pca_norm.h5')
         scaling_params = np.load( path_data+'X_scaling_lumin.npy')
@@ -49,15 +49,15 @@ def deep_approx_BC03():
         
         labelencoder = LabelEncoder()
         labelencoder.classes_ = np.load(path_data +'classes_metallicity.npy')
-        met_enc = labelencoder.transform(params['deep_bc03_pca_norm.metallicity'])
-        mat_params = concat([test_nn,params['deep_bc03_pca_norm.metallicity']], axis = 1).values
+        met_enc = labelencoder.transform(params['deep_bc03_grid.metallicity'])
+        mat_params = concat([test_nn,params['deep_bc03_grid.metallicity']], axis = 1).values
         
         param_norm = (mat_params-mean_X)/sd_X
         pred_NN = model.predict(param_norm)
         pred_NN_inv = pca_fit.inverse_transform(pred_NN)
         rescaled = np.exp(((pred_NN_inv)*sd_Y) + mean_Y)
         n = mat_params.shape[0]
-        mat_params[:,5] = params['deep_bc03_pca_norm.metallicity']
+        mat_params[:,5] = params['deep_bc03_grid.metallicity']
         datadb = dict()
         for i in range(n):
             datadb[tuple(np.around(mat_params[i,:],2))] = {'spec_young' : rescaled[i,0:6941],
