@@ -36,7 +36,7 @@ class NebularEmission(SedModule):
     params_nebular = params[names_deep_neb]
     path_cloudy =os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/data/'
 
-    all_lines = deep_cloudy.Deep_cloudy(params_nebular,path_cloudy )/(4*np.pi*(3.086*10**21)**2) #F = L/ 4*pi*D^2, D = 3.086*10*21 cm, 
+    all_lines = deep_cloudy.Deep_cloudy(params_nebular,path_cloudy )#/(4*np.pi*(3.086*10**21)**2) #F = L/ 4*pi*D^2, D = 3.086*10*21 cm, 
     all_lines /= 1e7 #Erg/S to W
     n = params_nebular.shape[0]
     #-------------------- Continuum part, to be added later -------#
