@@ -21,24 +21,24 @@ class NebularEmission(SedModule):
     near-infrared. It includes both the nebular lines and the nubular
     continuum (optional). It takes into account the escape fraction and the
     absorption by dust.
-
+    
     Given the number of Lyman continuum photons, we compute the Hβ line
     luminosity. We then compute the other lines using the
     metallicity-dependent templates that provide the ratio between individual
     lines and Hβ. The nebular continuum is scaled directly from the number of
     ionizing photons.
-
+    
     """
     path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
-    params = pd.read_csv(path_data+'deep_nebular_grid_parameters',sep=" ")
-    names_deep_neb = ["deep_nebular.logU",
-                       "deep_nebular.geometrical_factor",
-                       "deep_nebular.Age",
-                       "deep_nebular.log_O_H",
-                       "deep_nebular.log_N_O",
-                       "deep_nebular.HbFrac"]
+    params = pd.read_csv(path_data+'deep_nebular_grid_parameters.csv',sep=" ")
+    names_deep_neb = ["deep_nebular_grid.logU",
+       		           "deep_nebular_grid.geometrical_factor",
+       		           "deep_nebular_grid.Age",
+       		           "deep_nebular_grid.log_O_H",
+       		           "deep_nebular_grid.log_N_O",
+       		           "deep_nebular_grid.HbFrac"]
     params_nebular = params[names_deep_neb]
-
+       
     all_lines = deep_cloudy.Deep_cloudy(params_nebular,path_data )#/(4*np.pi*(3.086*10**21)**2) #F = L/ 4*pi*D^2, D = 3.086*10*21 cm, 
     all_lines /= 1e7 #Erg/S to W
     n = params_nebular.shape[0]
@@ -52,19 +52,16 @@ class NebularEmission(SedModule):
     #-------------------------------------------------------------#
     path_wave =path_data + 'dict_wavelength_lines.csv'
     df_wavelength_lines =  pd.read_csv(path_wave) #depends on the Cloudy training set
-    
     lines = all_lines[df_wavelength_lines['name']]
     wavelength_lines = df_wavelength_lines['wavelength']
     datadb_pyneb = dict()
     datadb_cloudy = dict()
     for i in range(n):
         datadb_cloudy[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : lines.iloc[i,:],
-                                                                 'names' : lines.columns,
-                                                                 'wave' : wavelength_lines}
+    	                                                     'names' : lines.columns,
+    	                                                     'wave' : wavelength_lines}
         # datadb_pyneb[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : cont.iloc[i,:],
         #                                                          'wave' : wavelength_cont/10}
-    
-    
     parameter_list = OrderedDict([
         ('logU', (
             'cigale_list(minvalue=-4., maxvalue=-1 )',
@@ -172,10 +169,10 @@ class NebularEmission(SedModule):
             self.absorbed_young = np.zeros(sed.wavelength_grid.size)
 
         self.absorbed_old[:self.idx_Ly_break] = -(
-            sed.get_lumin_contribution('stellar.old')[:self.idx_Ly_break] *
+            sed.luminosities['stellar.old'][:self.idx_Ly_break] *
             (1. - self.fesc))
         self.absorbed_young[:self.idx_Ly_break] = -(
-            sed.get_lumin_contribution('stellar.young')[:self.idx_Ly_break] *
+            sed.luminosities['stellar.young'][:self.idx_Ly_break] *
             (1. - self.fesc))
 
         sed.add_module(self.name, self.parameters)

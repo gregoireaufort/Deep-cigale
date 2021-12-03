@@ -26,7 +26,7 @@ class NebularEmission(SedModule):
     ionizing photons.
 
     """
-    params = pd.read_csv("/home/aufort/Desktop/cigale-master/params_nebular.txt",sep=" ")
+    params = pd.read_csv("/home/aufort/Bureau/cigale_bpt/cigale-cigale-BPT/params_nebular.txt",sep=" ")
     names_deep_neb = ["deep_nebular.logU",
                        "deep_nebular.geometrical_factor",
                        "deep_nebular.Age",
@@ -169,10 +169,10 @@ class NebularEmission(SedModule):
             self.absorbed_young = np.zeros(sed.wavelength_grid.size)
 
         self.absorbed_old[:self.idx_Ly_break] = -(
-            sed.get_lumin_contribution('stellar.old')[:self.idx_Ly_break] *
+            sed.luminosities['stellar.old'][:self.idx_Ly_break] *
             (1. - self.fesc))
         self.absorbed_young[:self.idx_Ly_break] = -(
-            sed.get_lumin_contribution('stellar.young')[:self.idx_Ly_break] *
+            sed.luminosities['stellar.young'][:self.idx_Ly_break] *
             (1. - self.fesc))
 
         sed.add_module(self.name, self.parameters)

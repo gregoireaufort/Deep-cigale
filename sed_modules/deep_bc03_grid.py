@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2013 Centre de données Astrophysiques de Marseille
 # Licensed under the CeCILL-v2 licence - see Licence_CeCILL_V2-en.txt
-# Author: Yannick Roehlly
+# Author:G.Aufot & Yannick Roehlly
 
 """
 Bruzual and Charlot (2003) stellar emission module
@@ -16,7 +16,6 @@ from collections import OrderedDict
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import tensorflow as tf
 from joblib import load
 from pandas import read_csv, concat, DataFrame
