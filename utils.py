@@ -18,6 +18,13 @@ class theta_params(object):
         self.mean = params[0]
         self.variance = params[1]
         self.proportions = params[2]
+
+class theta_params_discrete(object):
+    def __init__(self, params):
+        self.mean = params[0]
+        self.variance = params[1]
+        self.proportions = params[2]
+        self.disc_probs = params[3]
     
 def kl_mvn(m0, S0, m1, S1):
     """

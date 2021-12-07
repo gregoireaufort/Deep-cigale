@@ -167,7 +167,7 @@ def sample_to_cigale_input(sample,
     continuous_parameters_list =  CIGALE_parameters['module_parameters_to_fit']
     continuous_parameter_names = continuous_parameters_list.keys()
     logscale_params = [key for key in continuous_parameters_list if continuous_parameters_list[key]["type"] == "log"]
-    param_frame = pd.DataFrame(stats.norm.cdf(sample), columns = continuous_parameter_names)
+    param_frame = pd.DataFrame(stats.norm.cdf(sample), columns = continuous_parameter_names) # change to continuous + discrete 
     for name in continuous_parameter_names:
         param_frame[name] = rescale(param_frame[name],
                                continuous_parameters_list[name]["max"],

@@ -387,3 +387,40 @@ class Mixture_gaussian(object):
          return lpdf
 
 
+class Mixture_gaussian_discrete(object):
+   
+    def rvs(size, means, covs, weights,discrete_ws = None):
+        n_comp = len(means)
+        S=[]
+        index= np.random.choice(range(n_comp), p = weights, size = size)
+        n_draw = Counter(index)
+        for i in  n_draw.keys():
+            temp = stats.multivariate_normal.rvs(mean= means[i],
+                                      cov=covs[i],
+                                      size=n_draw[i])
+            S.append(temp.reshape(n_draw[i],means[i].shape[0]))
+        cont = np.array(list(itertools.chain(*S))).reshape((len(index),means[0].shape[0]))
+        discrete = rvs_discrete(size,discrete_ws)
+        return cont,discrete
+    
+    def logpdf(x,means, covs,weights,discrete_ws = None):
+         n_comp = len(means)
+         a=[np.log(weights[i]) + stats.multivariate_normal.logpdf(x[0],means[i],covs[i], allow_singular = True) for i in range(n_comp)]
+         cont =  np.logaddexp.reduce(a,axis = 0)
+         discrete = lpdf_discrete(x[1],discrete_ws)
+         lpdf = cont+discrete
+         return lpdf
+
+
+def lpdf_discrete(x,probs):
+    n = x.shape[0]
+    lpdf = [np.log(np.sum([probs[i][x[j,i]] for i in range(len(probs))])) for j in range(n)]
+    return np.array(lpdf)
+
+def rvs_discrete(n,probs):
+    discrete = [np.random.choice(range(len(probs[i])),
+                                     size= n,
+                                     replace = True, 
+                                     p = probs[i])
+        for i in range(len(probs))]
+    return np.array(discrete).T

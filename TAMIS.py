@@ -13,7 +13,6 @@ from utils import compute_ESS,compute_KL, compute_perplexity
 import scipy.stats as stats
 from GMM import GMM_fit, Mixture_gaussian
 import matplotlib.pyplot as plt
-#from celluloid import Camera
 import seaborn as sns
 from sklearn.utils import resample
 import pandas as pd
@@ -22,33 +21,6 @@ from scipy.optimize import bisect
 from scipy.special import logsumexp
 
 
-
-# def plot_convergence_2(TAMIS, iters = None, lim = 50, target_plot = None, title =None):
-#     camera = Camera(plt.figure())
-#     if not iters:
-#         iters= range(TAMIS.iteration)
-#     if not title:
-#         title = "test.gif"
-#     for iteration in iters:
-#         means = TAMIS.theta_total[iteration].mean
-#         covariances = TAMIS.theta_total[iteration].variance
-#         weights_prop = TAMIS.theta_total[iteration].proportions
-#         dots = Mixture_gaussian.rvs(size = 100, 
-#                              means = means,
-#                              covs = covariances,
-#                              weights = weights_prop)
-#         # plt.figure()
-#         if target_plot:
-#             target_plot()
-#         plt.scatter(dots[:,0], dots[:,1], s= 1, color = "blue")
-#         camera.snap()
-#         plt.xlim([-lim,lim])
-#         plt.ylim([-lim,lim])
-#         # plt.title(str(iteration))
-#         # plt.show()
-#         anim = camera.animate(blit=True)
-#         anim.save(title)
-            
             
 def adapt_beta(weights, alpha):
         """
@@ -129,7 +101,7 @@ class TAMIS(object):
             self.proposal = proposal
             self.p = 1
         
-        
+
     def proposal_rvs(self):
         """
         Samples from the proposal distribution, a multivariate gaussian if
@@ -177,12 +149,6 @@ class TAMIS(object):
         log_weight = targ_sample - proposal_sample
         unnorm_weight = np.exp(log_weight -np.max(log_weight))
         self.weights = unnorm_weight/np.sum(unnorm_weight)
-        # plt.hist(np.log10(self.weights+1e-50), bins = 50)
-        # plt.axvline(np.max(np.log10(self.weights +1e-50)), color = 'r')
-        # plt.xlabel("log10(weight)")
-        # plt.yscale('log')
-        # plt.title("untempered_weights")
-        # plt.show()
         self.total_weight.append(self.weights)
 
         ESS = compute_ESS(self.weights)
@@ -201,15 +167,6 @@ class TAMIS(object):
         log_unnorm_tempered_weights = targ_tempered - (proposal_sample*beta)
         unnorm_tempered_weights = np.exp(log_unnorm_tempered_weights -np.max(log_unnorm_tempered_weights))
         self.tempered_weights = unnorm_tempered_weights/np.sum(unnorm_tempered_weights)
-        # plt.hist(np.log10(self.tempered_weights +1e-50), bins = 50)
-        # plt.axvline(np.max(np.log10(self.tempered_weights +1e-50)), color = 'r')
-        # plt.axvline(np.quantile(np.log10(self.tempered_weights +1e-50),0.6), color = 'black')
-        # plt.xticks(list(plt.xticks()[0]) + [np.quantile(np.log10(self.tempered_weights +1e-50),0.6)])
-        # plt.xlabel("log10(weight)")
-        # plt.yscale('log')
-        # plt.title("tempered_weights")
-        # plt.show()
-        #print(np.quantile(self.tempered_weights,[0.4,0.5,0.6,0.7,0.95,0.99]))
         self.betas.append(beta)
         self.total_target.append(np.vstack(targ_sample))
         
@@ -256,10 +213,11 @@ class TAMIS(object):
                            init_parameters = theta,
                            EM_solver = self.EM_solver,
                            integer_weights=self.integer_weights)
-            #assert np.isnan(temp.mean[0][0]) == False
             theta.mean=temp.mean
             theta.variance=temp.variance
             theta.proportions= temp.proportions
+            if hasattr(theta, 'disc_probs'):
+                theta.disc_probs = update_discrete_probs(self.sample,self.weights)
         self.theta = theta
         self.theta_total.append(theta)
         
@@ -355,7 +313,6 @@ class TAMIS(object):
                              legend = "brief",
                              label = "KLD")
             plt.legend(loc = "center left")
-            #pl.set_xticks(range(self.max_iter + 1))
             ax2 = ax.twinx()
             sns.lineplot(x="Iteration",
                          y="Beta",
@@ -385,7 +342,6 @@ class TAMIS(object):
                              legend = "brief", 
                              label = "perplexity")
             plt.legend(loc = "center left")
-            #pl.set_xticks(range(self.max_iter + 1))
             ax2 = ax.twinx()
             sns.lineplot(x="Iteration",
                          y="Beta", 
