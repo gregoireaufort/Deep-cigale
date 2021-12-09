@@ -6,7 +6,7 @@ Created on Fri Mar 20 12:10:25 2020
 """
 
 import itertools
-from utils import logpdf_student
+#from utils import logpdf_student
 from collections import Counter
 import numpy as np
 import scipy.stats as stats
@@ -18,7 +18,7 @@ def E_step(sample,n_comp, means,variances, weights_comp):
     """
     outputs the logprobas of each obs to be in each cluster
     """
-    num =  [weights_comp[i]+ 
+    num =  [np.log(weights_comp[i])+  #### ???????? Wasn't in log but should ? 
              stats.multivariate_normal.logpdf(sample,
                                               means[i],
                                               variances[i],
@@ -345,7 +345,11 @@ class multivariate_t(object):
 
 class Mixture_t(object):
    
-    def rvs(size, means, covs, weights):
+    def rvs(size,  theta):
+        means = theta.mean
+        covs = theta.variance
+        weights = theta.proportions
+        
         n_comp = len(means)
         S=[]
         index= np.random.choice(range(n_comp), p = weights, size = size)
@@ -358,7 +362,11 @@ class Mixture_t(object):
             S.append(temp.reshape(n_draw[i],means[i].shape[0]))
         return np.array(list(itertools.chain(*S))).reshape((len(index),means[0].shape[0]))
     
-    def logpdf(x,means, covs,weights):
+    def logpdf(x, theta):
+         means = theta.mean
+         covs = theta.variance
+         weights = theta.proportions
+
          n_comp = len(means)
          lpdf =  np.logaddexp.reduce(
              [np.log(weights[i]) +multivariate_t.logpdf(x,means[i],covs[i]) for i in range(n_comp)],axis = 0)
@@ -368,7 +376,11 @@ class Mixture_t(object):
 
 class Mixture_gaussian(object):
    
-    def rvs(size, means, covs, weights):
+    def rvs(size, theta):
+        means = theta.mean
+        covs = theta.variance
+        weights = theta.proportions
+        
         n_comp = len(means)
         S=[]
         index= np.random.choice(range(n_comp), p = weights, size = size)
@@ -380,7 +392,11 @@ class Mixture_gaussian(object):
             S.append(temp.reshape(n_draw[i],means[i].shape[0]))
         return np.array(list(itertools.chain(*S))).reshape((len(index),means[0].shape[0]))
     
-    def logpdf(x,means, covs,weights):
+    def logpdf(x, theta):
+         means = theta.mean
+         covs = theta.variance
+         weights = theta.proportions
+         
          n_comp = len(means)
          a=[np.log(weights[i]) + stats.multivariate_normal.logpdf(x,means[i],covs[i], allow_singular = True) for i in range(n_comp)]
          lpdf =  np.logaddexp.reduce(a,axis = 0)
@@ -389,7 +405,11 @@ class Mixture_gaussian(object):
 
 class Mixture_gaussian_discrete(object):
    
-    def rvs(size, means, covs, weights,discrete_ws = None):
+    def rvs(size, theta):
+        means = theta.mean
+        covs = theta.variance
+        weights = theta.proportions
+        discrete_ws = theta.disc_probs
         n_comp = len(means)
         S=[]
         index= np.random.choice(range(n_comp), p = weights, size = size)
@@ -400,21 +420,27 @@ class Mixture_gaussian_discrete(object):
                                       size=n_draw[i])
             S.append(temp.reshape(n_draw[i],means[i].shape[0]))
         cont = np.array(list(itertools.chain(*S))).reshape((len(index),means[0].shape[0]))
-        discrete = rvs_discrete(size,discrete_ws)
-        return cont,discrete
+        discrete = rvs_discrete(size,discrete_ws) 
+        return np.concatenate((cont,discrete),axis = 1)
     
-    def logpdf(x,means, covs,weights,discrete_ws = None):
+    def logpdf(x, theta):
+         means = theta.mean
+         covs = theta.variance
+         weights = theta.proportions
+         discrete_ws = theta.disc_probs
          n_comp = len(means)
-         a=[np.log(weights[i]) + stats.multivariate_normal.logpdf(x[0],means[i],covs[i], allow_singular = True) for i in range(n_comp)]
+         n_params_disc = len(discrete_ws)
+         n_params_cont = x.shape[1] - n_params_disc
+         a=[np.log(weights[i]) + stats.multivariate_normal.logpdf(x[:,:n_params_cont],means[i],covs[i], allow_singular = True) for i in range(n_comp)]
          cont =  np.logaddexp.reduce(a,axis = 0)
-         discrete = lpdf_discrete(x[1],discrete_ws)
+         discrete = lpdf_discrete(x[:,n_params_cont:],discrete_ws)
          lpdf = cont+discrete
          return lpdf
 
 
 def lpdf_discrete(x,probs):
     n = x.shape[0]
-    lpdf = [np.log(np.sum([probs[i][x[j,i]] for i in range(len(probs))])) for j in range(n)]
+    lpdf = [np.log(np.sum([probs[i][int(x[j,i])] for i in range(len(probs))])) for j in range(n)]
     return np.array(lpdf)
 
 def rvs_discrete(n,probs):
@@ -424,3 +450,17 @@ def rvs_discrete(n,probs):
                                      p = probs[i])
         for i in range(len(probs))]
     return np.array(discrete).T
+
+
+def update_discrete_probs(sample,weights):
+    """
+    Assumes the weights are in normalized, and returns probs
+    """
+    probs = []
+    for i in range(sample.shape[1]):
+        n_values = len(np.unique(sample[:,i]))
+        P = []
+        for value in range(n_values):
+            P.append(np.sum(weights[sample[:,i] == value]))
+        probs.append(P)
+    return probs

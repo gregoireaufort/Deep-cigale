@@ -11,7 +11,7 @@ import numpy as np
 import time
 from utils import compute_ESS,compute_KL, compute_perplexity
 import scipy.stats as stats
-from GMM import GMM_fit, Mixture_gaussian
+from GMM import GMM_fit, Mixture_gaussian, update_discrete_probs
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.utils import resample
@@ -21,7 +21,6 @@ from scipy.optimize import bisect
 from scipy.special import logsumexp
 
 
-            
 def adapt_beta(weights, alpha):
         """
         Adapt beta by binary search to get a tempered ESS of alpha
@@ -109,20 +108,14 @@ class TAMIS(object):
         """
         n= self.n_sample[self.iteration]
         theta = self.theta
-        if self.p == 0:
-            self.sample = self.proposal.rvs(size = n, mean =theta.mean, cov = theta.variance)
-        else :
-            self.sample = self.proposal.rvs(size = n, means =theta.mean, covs = theta.variance,weights =theta.proportions)
+        self.sample = self.proposal.rvs(n, theta)
 
     def proposal_logpdf(self, x):
         """
         Computes the logpdf of x from the proposal
         """
         theta = self.theta
-        if self.p == 0:
-            pdf = self.proposal.logpdf(x, mean = theta.mean, cov = theta.variance)
-        else :
-            pdf = self.proposal.logpdf(x, means = theta.mean, covs = theta.variance,weights = theta.proportions)
+        pdf = self.proposal.logpdf(x, theta)
         return pdf 
     
     
@@ -131,7 +124,7 @@ class TAMIS(object):
             theta = self.theta
         else :
             theta = self.theta_total[self.iteration-1]
-        pdf = self.proposal.logpdf(x, means = theta.mean, covs = theta.variance,weights = theta.proportions)
+        pdf = self.proposal.logpdf(x,  theta)
         return pdf 
     
     
@@ -206,7 +199,7 @@ class TAMIS(object):
             theta.mean = np.average(self.sample, weights = weights,axis = 0)
             theta.variance = np.cov(self.sample, aweights = weights,rowvar = False ) 
         else :
-            temp = GMM_fit(sample = self.sample,
+            temp = GMM_fit(sample = self.sample[:,:self.dim],
                            weights= weights,
                            n_comp = self.n_comp,
                            tau =self.tau,
@@ -217,7 +210,8 @@ class TAMIS(object):
             theta.variance=temp.variance
             theta.proportions= temp.proportions
             if hasattr(theta, 'disc_probs'):
-                theta.disc_probs = update_discrete_probs(self.sample,self.weights)
+                n_cont = self.dim
+                theta.disc_probs = update_discrete_probs(self.sample[:,n_cont:],self.weights)
         self.theta = theta
         self.theta_total.append(theta)
         
