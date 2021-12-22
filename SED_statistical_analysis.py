@@ -35,14 +35,14 @@ def rescale(sample,minimum,maximum):
 
 
 
-def extract_lines(gal,wave,spec):
+def extract_lines(params,wave,spec):
     """
     Integrate emission lines and separate them from the continuum
 
     Parameters
     ----------
-    gal : galaxy
-        CIGALE galaxy object
+    params : dictionnary
+        CIGALE parameters
     spectre : array like
         observed spectrum
 
@@ -54,15 +54,15 @@ def extract_lines(gal,wave,spec):
         new_wave : wavelength of the spectrum without emission lines
 
     """
-    width = gal.info["nebular.lines_width"]
-    limits = [(line[0] - 3. * (line[0] *width * 1e3 / cst.c),line[0] + 3. *  (line[0] *width * 1e3 / cst.c)) for line in gal.lines.values()]
+    width = params["nebular"]["lines_width"]
+    lines_waves = params["nebular"]["lines_waves"]
+    limits = [(line - 3. * (line *width * 1e3 / cst.c),line + 3. *  (line *width * 1e3 / cst.c)) for line in lines_waves]
     lines = [limit_spec(wave,spec,limit[0],limit[1]) for limit in limits]
-    wave_to_remove = np.array(list(chain(*[line[0] for line in lines])))
-    flux_to_remove = gal.fnu[np.in1d(wave, wave_to_remove)]
+    wave_to_remove = np.unique(np.array(list(chain(*[line[0] for line in lines]))))
     integrated_lines = [np.trapz(C[1],C[0]) for C in lines]
-    continuum =  np.setdiff1d(spec,flux_to_remove)
-    new_wave = np.setdiff1d(wave,wave_to_remove)
-    return integrated_lines, continuum, new_wave
+    continuum =  np.delete(spec,np.in1d(wave, wave_to_remove))
+    new_wave = np.delete(wave,np.in1d(wave, wave_to_remove))
+    return continuum, new_wave, integrated_lines
 
 
 def window_averaging(wavelength,spectrum):
@@ -70,6 +70,7 @@ def window_averaging(wavelength,spectrum):
      mid_point =(spectrum[1:] + spectrum[:-1])/2
      spec = np.average(mid_point,weights = delta_lambda)
      return spec
+ 
 def binning_flux(wavelength, spectrum, n_bins,L_min,L_max):
     """Bins the spectroscopy
     
@@ -89,6 +90,8 @@ def binning_flux(wavelength, spectrum, n_bins,L_min,L_max):
     spec_b = [window_averaging(wavelength[idx == i],spectrum[idx == i]) for i in range(1,n_bins +1)]
     wave_b = [np.mean(wavelength[idx == i]) for i in range(1,n_bins +1)]
     return wave_b,spec_b
+
+
 def var_trapz(wave,var):
     """We assume no correlation """
     seq_diff = (wave[1:] -wave[:-1]) #consecutive differences for the step
@@ -130,22 +133,22 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
                                     err,
                                     L_min,
                                     L_max)
-    covar_lines = 0*np.eye(2)
+    
     if "lines" in CIGALE_parameters["mode"]:
         limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
         lines = [limit_spec(wave,err,limit[0],limit[1]) for limit in limits]
         wave_to_remove = np.array(list(chain(*[line[0] for line in lines])))
         err_to_remove = err[np.in1d(wave, wave_to_remove)]
-        covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
-        err =  np.setdiff1d(err,err_to_remove)
-        wave = np.setdiff1d(wave,wave_to_remove)
+        #covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
+        lim_err =  np.setdiff1d(lim_err,err_to_remove)
+        lim_wave = np.setdiff1d(lim_wave,wave_to_remove)
 
     _,covar_continuum = binning_variances(lim_wave, 
                                           lim_err, 
                                           CIGALE_parameters["n_bins"],
                                           L_min,
                                           L_max)
-    return np.diag(covar_lines), np.diag(covar_continuum)
+    return np.diag(covar_continuum)
 
 
 def sample_to_cigale_input(sample,
@@ -165,22 +168,24 @@ def sample_to_cigale_input(sample,
                     
     """
     continuous_parameters_list =  CIGALE_parameters['module_parameters_to_fit']
-    continuous_parameter_names = continuous_parameters_list.keys()
+    discrete_parameters = CIGALE_parameters["module_parameters_discrete"]
+    discrete_parameters_names = list(discrete_parameters.keys())
+    continuous_parameter_names = list(continuous_parameters_list.keys())
     logscale_params = [key for key in continuous_parameters_list if continuous_parameters_list[key]["type"] == "log"]
-    param_frame = pd.DataFrame(stats.norm.cdf(sample), columns = continuous_parameter_names) # change to continuous + discrete 
+    param_frame = pd.DataFrame(sample, 
+                               columns = continuous_parameter_names + discrete_parameters_names) # change to continuous + discrete 
     for name in continuous_parameter_names:
-        param_frame[name] = rescale(param_frame[name],
+        param_frame[name] = rescale(stats.norm.cdf(param_frame[name]),
                                continuous_parameters_list[name]["max"],
                                continuous_parameters_list[name]["min"])
         
         if name in logscale_params:
             param_frame[name] = 10**param_frame[name]
     
-    discrete_parameters = CIGALE_parameters["module_parameters_discrete"]
+    
     for name in discrete_parameters.keys():
-        param_frame[name] = np.random.choice(discrete_parameters[name],
-                                             size = param_frame.shape[0],
-                                             p = weights_discrete)
+        param_frame[name] = np.array(discrete_parameters[name])[param_frame[name].astype(int)]
+                                             
     modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
     parameter_list =[[{param:param_frame[param].iloc[i] for param in module_params} for module_params in modules_params] for i in range(param_frame.shape[0])] 
     
@@ -190,35 +195,40 @@ def sample_to_cigale_input(sample,
     
     new_names = dict(zip(old_names,deep_names))
     param_frame.rename(columns = new_names, inplace = True)
-    deep_params = param_frame.filter(like = "deep")
-    deep_params.to_csv(CIGALE_parameters['path_deep'], index = False, sep = " ")
+    for module_name in list_deep_modules:
+        deep_params = param_frame.filter(like = module_name)
+        file_name = CIGALE_parameters['path_deep']+module_name+'_parameters.csv'
+        deep_params.to_csv(file_name, index = False, sep = " ")
     param_frame.to_csv(CIGALE_parameters['file_store'], mode ='a',index = False)
     return parameter_list
 
 
 def cigale(params_input_cigale,CIGALE_parameters,warehouse):
-    
+    photo, spectro, lines = np.ones(2),np.ones(2),np.ones(2)
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
     if "photo" in CIGALE_parameters["mode"]:
         photo = np.array([SED.compute_fnu(band) for band in CIGALE_parameters['bands']])
-    else :
-        photo =np.ones(2)
+
     if "spectro" in CIGALE_parameters["mode"]:
         wavelength,spectrum = SED.wavelength_grid, SED.fnu
         L_min =  CIGALE_parameters['wavelength_limits']["min"]
         L_max =CIGALE_parameters['wavelength_limits']["max"]
-        lim_wave, lim_spec = limit_spec(wavelength,
-                                        spectrum,
+        new_spec, new_wave,lines = extract_lines(CIGALE_parameters,
+                                                 wavelength,
+                                                 spectrum)
+        lim_wave, lim_spec = limit_spec(new_wave,
+                                        new_spec,
                                         L_min,
                                         L_max)
-        # lines, lim_spec, lim_wave  = extract_lines(SED,wavelength,spectrum)
         _,spectro = binning_flux(lim_wave,
-                                 lim_spec,CIGALE_parameters['n_bins'],
+                                 lim_spec,
+                                 CIGALE_parameters['n_bins'],
                                   L_min,
                                   L_max)
-    else:
-        spectro, lines = np.ones(2),np.ones(2)
-    lines = np.ones(2)
+    if "lines" in CIGALE_parameters["mode"]:
+        lines = lines
+    elif "lines" not in CIGALE_parameters["mode"]:
+        lines = np.ones(2)
     return  photo,np.array(spectro), lines
     
 def scale_factor_pre_computation(target_photo,
@@ -235,16 +245,20 @@ def scale_factor_pre_computation(target_photo,
         inv_cov_photo = np.linalg.pinv(cov_photo)
         half_num_constant_spectro = target_spectro @ inv_cov_spectro
         half_num_constant_photo = target_photo @ inv_cov_photo
+        
     elif "spectro" in mode and not "photo" in mode:
         inv_cov_spectro = np.linalg.pinv(cov_spectro)
         half_num_constant_spectro = target_spectro @ inv_cov_spectro
         half_num_constant_photo = np.zeros(2)
         inv_cov_photo =  0*np.eye(2)
+        
     elif (not "spectro" in mode) and "photo" in mode:
         inv_cov_spectro =  0*np.eye(2)
         inv_cov_photo = np.linalg.pinv(cov_photo)
         half_num_constant_spectro =  np.zeros(2)
         half_num_constant_photo = target_photo @ inv_cov_photo
+        
+        
     return inv_cov_spectro, inv_cov_photo, half_num_constant_spectro,  half_num_constant_photo
 
 
@@ -265,7 +279,8 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
     """
 
     n_jobs = CIGALE_parameters["n_jobs"]
-    cigale_input = sample_to_cigale_input(sample, CIGALE_parameters)
+    S =sample.copy()
+    cigale_input = sample_to_cigale_input(S, CIGALE_parameters)
     global _compute_scaled_SED
     if CIGALE_parameters["deep_modules"] is not None:
         for deep_module in CIGALE_parameters["deep_modules"]:
@@ -283,11 +298,11 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         scaled_lines = constant*SED_lines
         
         return scaled_photo,scaled_spectro, scaled_lines
-    with mp.Pool(processes=n_jobs) as pool:
-        computed = pool.map(_compute_scaled_SED, cigale_input)
-    #computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale
-    #                                                                   ) for input_cigale in cigale_input)
-    #computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
+    # with mp.Pool(processes=n_jobs) as pool:
+    #     computed = pool.map(_compute_scaled_SED, cigale_input)
+    #computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale ) for input_cigale in cigale_input)
+                                                                     
+    computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
     scaled_photo = [res[0] for res in computed]
     scaled_spectro = [res[1] for res in computed]
     scaled_lines = [res[2] for res in computed]
@@ -304,29 +319,36 @@ def lim_target_spectro(observed_galaxy,CIGALE_parameters):
                                     spectrum,
                                     L_min,
                                     L_max)
-    _,binned_spec = binning_flux(lim_wave,
-                                 lim_spec,CIGALE_parameters['n_bins'],
-                                 L_min,
-                                 L_max)
-    return binned_spec
+    return np.array(lim_wave),np.array(lim_spec)
 
 
 def extract_target(observed_galaxy,CIGALE_parameters):
+    target_photo, covar_photo = None, None
+    target_spectro, covar_spectro = None, None
+    target_lines, covar_lines = None, None
+    
     if  observed_galaxy["photometry_fluxes"] is not None and "photo" in CIGALE_parameters["mode"]:
-            target_photo = observed_galaxy["photometry_fluxes"]
+            target_photo = np.array(observed_galaxy["photometry_fluxes"])
             covar_photo = np.diag(observed_galaxy["photometry_err"]**2)
-    else :
-        target_photo,covar_photo = None, None
     
     if observed_galaxy["spectroscopy_fluxes"]  is not None and "spectro" in CIGALE_parameters["mode"]:
-        target_spectro = lim_target_spectro(observed_galaxy,
+        wave_spectro,target_spectro = lim_target_spectro(observed_galaxy,
                                                  CIGALE_parameters)
-        # self.target_lines = extract_lines(gal,wave,spec) # rewrite
-        target_lines = None
-        covar_lines,covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
-    else : 
-        target_spectro, covar_spectro = None, None
-        target_lines, covar_lines = None, None
+        target_spectro,wave_spectro,_ = extract_lines(CIGALE_parameters,
+                                                    wave_spectro,
+                                                    target_spectro)
+        wave_spectro,target_spectro = binning_flux(wave_spectro,
+                             target_spectro,
+                             CIGALE_parameters['n_bins'],
+                             CIGALE_parameters['wavelength_limits']["min"],
+                             CIGALE_parameters['wavelength_limits']["max"])
+        
+        covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
+    if "lines_fluxes" in observed_galaxy.keys() and "lines" in CIGALE_parameters["mode"]:
+        target_lines = observed_galaxy["lines_fluxes"]
+        covar_lines =  np.diag(observed_galaxy["lines_err"]**2)
+        
+        
     return target_photo,target_lines, target_spectro,covar_photo,covar_spectro, covar_lines
 
 class target_SED(object):
@@ -360,7 +382,7 @@ class target_SED(object):
         target_spectro = self.target_spectro
         covar_photo = self.covar_photo
         covar_spectro = self.covar_spectro
-        target_lines = None
+        target_lines = self.target_lines
         covar_lines = self.covar_lines
         constants = self.pre_computed_constants
         CIGALE_parameters = self.CIGALE_parameters
@@ -386,11 +408,11 @@ class target_SED(object):
                                                                                cov = covar_spectro,
                                                                                allow_singular = True))
 
-            if target_lines is not None: 
-                log_likelihood_lines = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_lines,
-                                                                                    mean = target_lines,
-                                                                                    cov = covar_lines,
-                                                                                    allow_singular = True))
+        if "lines" in CIGALE_parameters["mode"]: 
+            log_likelihood_lines = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_lines,
+                                                                                mean = target_lines,
+                                                                                cov = covar_lines,
+                                                                                allow_singular = True))
                 
         total_loglike = weight_spectro*log_likelihood_spectro + log_likelihood_photo + log_likelihood_lines 
         
@@ -400,12 +422,14 @@ class target_SED(object):
         """ Computes the unitary gaussian logpdf as the parameter space is 
         projected in R^dim
         """
-        dim = self.dim
-        var0 = [1]*dim
-        logprior = stats.multivariate_normal.logpdf(sample,
-                                                    mean = np.zeros((dim,)),
+        dim_cont = len(self.CIGALE_parameters['module_parameters_to_fit'])
+        dim_disc = len(self.CIGALE_parameters['module_parameters_discrete'])
+        var0 = [1]*dim_cont
+        logprior_cont = stats.multivariate_normal.logpdf(sample[:,:dim_cont],
+                                                    mean = np.zeros((dim_cont,)),
                                                     cov = np.diag(var0))
-        return logprior
+        logprior_disc = 0 #To adjust later ? 
+        return logprior_cont + logprior_disc
     
 def create_output_files(CIGALE_parameters,result):
     parameters = pd.read_csv(CIGALE_parameters['file_store'])
@@ -424,7 +448,9 @@ def check_output_file(CIGALE_parameters):
         
 def fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters):
     module_list = CIGALE_parameters['module_list']
-    warehouse = SedWarehouse(nocache = module_list)
+#    warehouse = SedWarehouse(nocache ='deep_nebular' )
+    warehouse = SedWarehouse(nocache ='deep_bc03_pca_norm' )
+
     check_output_file(CIGALE_parameters)
     target_distrib = target_SED(galaxy_obs,
                                 CIGALE_parameters,

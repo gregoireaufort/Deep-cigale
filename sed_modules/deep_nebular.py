@@ -11,22 +11,9 @@ import scipy.constants as cst
 
 from pcigale.data import  deep_cloudy #,deep_pyneb
 from . import SedModule
-
-class NebularEmission(SedModule):
-    """
-    Module computing the nebular emission from the ultraviolet to the
-    near-infrared. It includes both the nebular lines and the nubular
-    continuum (optional). It takes into account the escape fraction and the
-    absorption by dust.
-
-    Given the number of Lyman continuum photons, we compute the Hβ line
-    luminosity. We then compute the other lines using the
-    metallicity-dependent templates that provide the ratio between individual
-    lines and Hβ. The nebular continuum is scaled directly from the number of
-    ionizing photons.
-
-    """
-    params = pd.read_csv("/home/aufort/Bureau/cigale_bpt/cigale-cigale-BPT/params_nebular.txt",sep=" ")
+def deep_approx_nebular():
+    path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
+    params = pd.read_csv(path_data+'deep_nebular_parameters.csv',sep=" ")
     names_deep_neb = ["deep_nebular.logU",
                        "deep_nebular.geometrical_factor",
                        "deep_nebular.Age",
@@ -61,6 +48,21 @@ class NebularEmission(SedModule):
         # datadb_pyneb[tuple(np.around(params_nebular.iloc[i,:],4))] = {'lumin' : cont.iloc[i,:],
         #                                                          'wave' : wavelength_cont/10}
     
+    return datadb_cloudy
+class NebularEmission(SedModule):
+    """
+    Module computing the nebular emission from the ultraviolet to the
+    near-infrared. It includes both the nebular lines and the nubular
+    continuum (optional). It takes into account the escape fraction and the
+    absorption by dust.
+
+    Given the number of Lyman continuum photons, we compute the Hβ line
+    luminosity. We then compute the other lines using the
+    metallicity-dependent templates that provide the ratio between individual
+    lines and Hβ. The nebular continuum is scaled directly from the number of
+    ionizing photons.
+
+    """
     
     parameter_list = OrderedDict([
         ('logU', (
@@ -114,7 +116,12 @@ class NebularEmission(SedModule):
             True
         ))
     ])
-
+    
+    
+    datadb_cloudy = deep_approx_nebular()
+    
+    
+    
     def _init_code(self):
         """Get the nebular emission lines out of the database and resample
            them to see the line profile. Compute scaling coefficients.
@@ -153,7 +160,7 @@ class NebularEmission(SedModule):
         self.idx_Ly_break = None
         self.absorbed_old = None
         self.absorbed_young = None
-
+        
     def process(self, sed):
         """Add the nebular emission lines
 

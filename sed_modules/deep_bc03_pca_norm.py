@@ -32,7 +32,7 @@ def deep_approx_BC03():
         path_data = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
         params_sfh = read_csv(path_data+'deep_sfhdelayed_parameters.csv',sep=" ")
         params_bc03 = read_csv(path_data+'deep_bc03_pca_norm_parameters.csv',sep=" ")
-        params = params_sfh.merge(params_bc03, how = 'cross')
+        params = params_sfh.merge(params_bc03, how = 'right')
         model = tf.keras.models.load_model(path_data+'ANN/NN_pca_norm.h5')
         scaling_params = np.load( path_data+'X_scaling_lumin.npy')
         mean_X, sd_X = scaling_params[:,0], scaling_params[:,1]
