@@ -99,7 +99,7 @@ class SFHDelayed(SedModule):
 
         # We add the age burst exponential for ages superior to age_main -
         # age_burst
-        self.sfr[-(t_burst[-1] + 1):] += sfr_burst
+        self.sfr[-(t_burst.astype("int")[-1] + 1):] += sfr_burst
 
         # Compute the integral of the SFH and normalise it to 1 solar mass
         # if asked to.
