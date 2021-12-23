@@ -448,7 +448,7 @@ def check_output_file(CIGALE_parameters):
         
 def fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters):
     module_list = CIGALE_parameters['module_list']
-#    warehouse = SedWarehouse(nocache ='deep_nebular' )
+    #warehouse = SedWarehouse(nocache ='deep_nebular' )
     warehouse = SedWarehouse(nocache ='deep_bc03_pca_norm' )
 
     check_output_file(CIGALE_parameters)
