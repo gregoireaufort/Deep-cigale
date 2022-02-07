@@ -9,6 +9,8 @@ Created on Thu Jan 21 12:26:01 2021
 from  TAMIS import TAMIS
 import seaborn as sns
 from astropy.table import Table
+from astropy.io import fits
+
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
@@ -484,38 +486,56 @@ def read_galaxy(file_photo, file_spectro):
                         }
                         
     return observed_galaxy
+def read_spectro_moons(file):
+        
+    hdul = fits.open(file)
+    noisy = hdul[1].data
+    noise_array =  hdul[8].data
+    wave = np.linspace(hdul[0].header["WMIN"],
+                       hdul[0].header["WMAX"],
+                       len(noisy))
+    redshift = hdul[0].header["Z"]
+    return noisy,noise_array,wave, redshift
+
 
 def read_galaxy_fits(photo_file,spectro_file,ident = None):
-    #to rewrite with bands in database
-    table = Table.read(photo_file)
-    table = table.to_pandas()
-    if ident :
-        photo = table[list(table.columns[4:32])][table['id'] == ident]
-        redshift =table["redshift"][table["id"]==ident].iloc[0]
-    else :
-        photo = table[list(table.columns[4:32])][0]
-        redshift = table["redshift"][0][0]
-    bands = []
-    err = []
-    for band in photo.columns:
-        if band.endswith('_err'):
-            err.append(band)
-        else:
-            bands.append(band)
-    photo_flux = np.array(photo[bands]).reshape(len(bands),)
-    photo_err = np.array(photo[err]).reshape(len(err),)
-    
-    spectro = Table.read(spectro_file)
-    spectro_flux = np.array(spectro["Fnu"])
-    spectro_err = np.array(0.1*spectro_flux)
-    spectro_wavelength = np.array(spectro["wavelength"])
-    observed_galaxy  = {"spectroscopy_wavelength":spectro_wavelength,
-                        "spectroscopy_fluxes":spectro_flux,
-                        "spectroscopy_err" : spectro_err,
+    photo_flux = None
+    photo_err = None
+    spec_flux = None
+    spec_err = None
+    spec_wavelength = None
+    if photo_file is not None:
+        #to rewrite with bands in database
+        table = Table.read(photo_file)
+        table = table.to_pandas()
+        if ident :
+            photo = table[list(table.columns[4:32])][table['id'] == ident]
+            z =table["redshift"][table["id"]==ident].iloc[0]
+        else :
+            photo = table[list(table.columns[4:32])][0]
+            z = table["redshift"][0][0]
+        bands = []
+        err = []
+        for band in photo.columns:
+            if band.endswith('_err'):
+                err.append(band)
+            else:
+                bands.append(band)
+        photo_flux = np.array(photo[bands]).reshape(len(bands),)
+        photo_err = np.array(photo[err]).reshape(len(err),)
+    # spectro = Table.read(spectro_file)
+    # spectro_flux = np.array(spectro["Fnu"])
+    # spectro_err = np.array(0.1*spectro_flux)
+    # spectro_wavelength = np.array(spectro["wavelength"])
+    if spectro_file is not None:
+        spec_flux,spec_err,spec_wavelength,z = read_spectro_moons(spectro_file)
+    observed_galaxy  = {"spectroscopy_wavelength":spec_wavelength,
+                        "spectroscopy_fluxes":spec_flux,
+                        "spectroscopy_err" : spec_err,
                         "photometry_fluxes" : photo_flux,
                         "photometry_err" :photo_err,
                         "bands" : bands,
-                        "redshift" : redshift
+                        "redshift" : z
                         }
     
     return observed_galaxy
