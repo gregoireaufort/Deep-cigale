@@ -440,14 +440,14 @@ class Mixture_gaussian_discrete(object):
 
 def lpdf_discrete(x,probs):
     n = x.shape[0]
-    lpdf = [np.log(np.sum([probs[i][int(x[j,i])] for i in range(len(probs))])) for j in range(n)]
+    lpdf = [np.log(np.prod([probs[i][int(x[j,i])] for i in range(len(probs))])) for j in range(n)]
     return np.array(lpdf)
 
 def rvs_discrete(n,probs):
     discrete = [np.random.choice(range(len(probs[i])),
                                      size= n,
                                      replace = True, 
-                                     p = probs[i])
+                                     p = probs[i]/np.sum(probs[i]))
         for i in range(len(probs))]
     return np.array(discrete).T
 
@@ -461,6 +461,6 @@ def update_discrete_probs(sample,weights):
         n_values = len(np.unique(sample[:,i]))
         P = []
         for value in range(n_values):
-            P.append(np.sum(weights[sample[:,i] == value]))
+            P.append(np.sum(weights[sample[:,i] == value]) + (1/(10*n_values)))
         probs.append(P)
     return probs

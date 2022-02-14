@@ -57,7 +57,7 @@ def extract_lines(params,wave,spec):
 
     """
     width = params["nebular"]["lines_width"]
-    lines_waves = params["nebular"]["lines_waves"]
+    lines_waves = params["nebular"]["line_waves"]
     limits = [(line - 3. * (line *width * 1e3 / cst.c),line + 3. *  (line *width * 1e3 / cst.c)) for line in lines_waves]
     lines = [limit_spec(wave,spec,limit[0],limit[1]) for limit in limits]
     wave_to_remove = np.unique(np.array(list(chain(*[line[0] for line in lines]))))
@@ -184,7 +184,8 @@ def sample_to_cigale_input(sample,
         if name in logscale_params:
             param_frame[name] = 10**param_frame[name]
     
-    
+
+
     for name in discrete_parameters.keys():
         param_frame[name] = np.array(discrete_parameters[name])[param_frame[name].astype(int)]
                                              
@@ -523,12 +524,12 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
                 bands.append(band)
         photo_flux = np.array(photo[bands]).reshape(len(bands),)
         photo_err = np.array(photo[err]).reshape(len(err),)
-    # spectro = Table.read(spectro_file)
-    # spectro_flux = np.array(spectro["Fnu"])
-    # spectro_err = np.array(0.1*spectro_flux)
-    # spectro_wavelength = np.array(spectro["wavelength"])
-    if spectro_file is not None:
-        spec_flux,spec_err,spec_wavelength,z = read_spectro_moons(spectro_file)
+    spec = Table.read(spectro_file)
+    spec_flux = np.array(spec["Fnu"])
+    spec_err = np.array(0.1*spec_flux)
+    spec_wavelength = np.array(spec["wavelength"])
+
+    
     observed_galaxy  = {"spectroscopy_wavelength":spec_wavelength,
                         "spectroscopy_fluxes":spec_flux,
                         "spectroscopy_err" : spec_err,
@@ -537,7 +538,16 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
                         "bands" : bands,
                         "redshift" : z
                         }
-    
+        # if spectro_file is not None:
+    #     spec_flux,spec_err,spec_wavelength,z = read_spectro_moons(spectro_file)
+    # observed_galaxy  = {"spectroscopy_wavelength":spec_wavelength,
+    #                     "spectroscopy_fluxes":spec_flux,
+    #                     "spectroscopy_err" : spec_err,
+    #                     "photometry_fluxes" : photo_flux,
+    #                     "photometry_err" :photo_err,
+    #                     "bands" : bands,
+    #                     "redshift" : z
+    #                     }
     return observed_galaxy
 def split_name_params(columns):
     new_columns = []
