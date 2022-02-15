@@ -303,7 +303,7 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         return scaled_photo,scaled_spectro, scaled_lines
     # with mp.Pool(processes=n_jobs) as pool:
     #     computed = pool.map(_compute_scaled_SED, cigale_input)
-    #computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale ) for input_cigale in cigale_input)
+    # MARCHE PAS computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale ) for input_cigale in cigale_input)
                                                                      
     computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
     scaled_photo = [res[0] for res in computed]

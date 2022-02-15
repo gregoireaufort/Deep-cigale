@@ -45,7 +45,7 @@ galaxy_obs = SED_statistical_analysis.read_galaxy_fits("observations.fits",
 bands = list(galaxy_obs["bands"])
 pcigale.sed_modules.get_module('deep_bc03_pca_norm')
 module_list = ['deep_sfhdelayed', 'deep_bc03_pca_norm','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
-path_deep = '/home/aufort/Desktop/cigale-master/params_comparison.txt'
+path_deep = '/home/aufort/Bureau/cigale_bpt/cigale-cigale-BPT/pcigale/data/'
 file_store = 'store_parameters_'+str(galaxy_targ["id"])+'_deep.csv'
 deep_modules = [pcigale.sed_modules.deep_bc03_pca_norm]
 module_parameters_to_fit = {'tau_main': {"type":"unif","min":1500,"max" :3000},
@@ -135,6 +135,11 @@ TAMIS_parameters = {'dim_prior' : dim_prior,
                     "verbose" : True
     
 }
+np.random.seed(42)
+
+
+# result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters)
+
 
 module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
 file_store_normal = 'store_parameters_'+str(galaxy_targ["id"])+'_spectro_normal.csv'
@@ -151,10 +156,12 @@ CIGALE_parameters_normal = {"module_list":module_list_normal,
                     "bands" :bands,
                     "mode" : ["spectro"],
                     "n_jobs" : 10}
+np.random.seed(42)
+
 result_normal = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters_normal, TAMIS_parameters)
 
 
 
-SED_statistical_analysis.plot_result(CIGALE_parameters_normal,
-                                     line_dict_fit = fit_jorge,
-                                     title = "CIGALE Jorge 1 spectro")
+# SED_statistical_analysis.plot_result(CIGALE_parameters_normal,
+#                                      line_dict_fit = fit_jorge,
+#                                      title = "CIGALE Jorge 1 spectro")
