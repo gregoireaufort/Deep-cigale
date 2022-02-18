@@ -97,8 +97,8 @@ dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of contin
 n_comp = 4 #arbitrary
 ESS_tol = 300*dim_prior 
 proposal = Mixture_gaussian_discrete
-T_max = 10
-n_sample = [800]*T_max
+T_max = 20
+n_sample = [1000]*T_max
 alpha = 100
 
 #NEED TO AUTOMATE THIS PART, USELESS TO SET UP
@@ -134,5 +134,30 @@ np.random.seed(42)
 result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters)
 
 SED_statistical_analysis.plot_result(CIGALE_parameters,
+                                      line_dict_fit = fit_jorge,
+                                      title = "CIGALE Jorge 1 spectro")
+
+
+module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
+file_store_normal = 'store_parameters_'+str(galaxy_targ["id"])+'_spectro_normal.csv'
+
+CIGALE_parameters_normal = {"module_list":module_list_normal,
+                    "path_deep" : path_deep,    
+                    "file_store":file_store_normal,
+                    "deep_modules":None,
+                    "module_parameters_to_fit":module_parameters_to_fit,
+                    "module_parameters_discrete":module_parameters_discrete,
+                    "n_bins":100,
+                    "wavelength_limits" : wavelength_limits,
+                    "nebular" :nebular_params,
+                    "bands" :bands,
+                    "mode" : ["spectro"],
+                    "n_jobs" : 10}
+np.random.seed(42)
+
+result_normal = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters_normal, TAMIS_parameters)
+
+
+SED_statistical_analysis.plot_result(CIGALE_parameters_normal,
                                       line_dict_fit = fit_jorge,
                                       title = "CIGALE Jorge 1 spectro")

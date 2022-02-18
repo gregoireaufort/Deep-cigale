@@ -301,11 +301,11 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         scaled_lines = constant*SED_lines
         
         return scaled_photo,scaled_spectro, scaled_lines
-    # with mp.Pool(processes=n_jobs) as pool:
-    #     computed = pool.map(_compute_scaled_SED, cigale_input)
+    with mp.Pool(processes=n_jobs) as pool:
+        computed = pool.map(_compute_scaled_SED, cigale_input)
     # MARCHE PAS computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale ) for input_cigale in cigale_input)
                                                                      
-    computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
+    #computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
     scaled_photo = [res[0] for res in computed]
     scaled_spectro = [res[1] for res in computed]
     scaled_lines = [res[2] for res in computed]
@@ -549,6 +549,47 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
     #                     "redshift" : z
     #                     }
     return observed_galaxy
+
+
+
+def read_galaxy_moons(spectro_file, photo_file, ident = None):
+    photo_flux = None
+    photo_err = None
+    spec_flux = None
+    spec_err = None
+    spec_wavelength = None
+    if photo_file is not None:
+        #to rewrite with bands in database
+        table = Table.read(photo_file)
+        table = table.to_pandas()
+        if ident :
+            photo = table[list(table.columns[4:32])][table['id'] == ident]
+            z =table["redshift"][table["id"]==ident].iloc[0]
+        else :
+            photo = table[list(table.columns[4:32])][0]
+            z = table["redshift"][0][0]
+        bands = []
+        err = []
+        for band in photo.columns:
+            if band.endswith('_err'):
+                err.append(band)
+            else:
+                bands.append(band)
+        photo_flux = np.array(photo[bands]).reshape(len(bands),)
+        photo_err = np.array(photo[err]).reshape(len(err),)
+    if spectro_file is not None:
+        spec_flux,spec_err,spec_wavelength,z = read_spectro_moons(spectro_file)
+    observed_galaxy  = {"spectroscopy_wavelength":spec_wavelength,
+                        "spectroscopy_fluxes":spec_flux,
+                        "spectroscopy_err" : spec_err,
+                        "photometry_fluxes" : photo_flux,
+                        "photometry_err" :photo_err,
+                        "bands" : bands,
+                        "redshift" : z
+                        }
+    return observed_galaxy
+
+
 def split_name_params(columns):
     new_columns = []
     for col in columns:
