@@ -68,9 +68,12 @@ def extract_lines(params,wave,spec):
 
 
 def window_averaging(wavelength,spectrum):
-     delta_lambda = wavelength[1:] - wavelength[:-1] 
-     mid_point =(spectrum[1:] + spectrum[:-1])/2
-     spec = np.average(mid_point,weights = delta_lambda)
+     if len(spectrum) >1:
+         delta_lambda = wavelength[1:] - wavelength[:-1] 
+         mid_point =(spectrum[1:] + spectrum[:-1])/2
+         spec = np.average(mid_point,weights = delta_lambda)
+     else :
+         spec = spectrum
      return spec
  
 def binning_flux(wavelength, spectrum, n_bins,L_min,L_max):
@@ -538,16 +541,6 @@ def read_galaxy_fits(photo_file,spectro_file,ident = None):
                         "bands" : bands,
                         "redshift" : z
                         }
-        # if spectro_file is not None:
-    #     spec_flux,spec_err,spec_wavelength,z = read_spectro_moons(spectro_file)
-    # observed_galaxy  = {"spectroscopy_wavelength":spec_wavelength,
-    #                     "spectroscopy_fluxes":spec_flux,
-    #                     "spectroscopy_err" : spec_err,
-    #                     "photometry_fluxes" : photo_flux,
-    #                     "photometry_err" :photo_err,
-    #                     "bands" : bands,
-    #                     "redshift" : z
-    #                     }
     return observed_galaxy
 
 
@@ -558,6 +551,7 @@ def read_galaxy_moons(spectro_file, photo_file, ident = None):
     spec_flux = None
     spec_err = None
     spec_wavelength = None
+    bands = None
     if photo_file is not None:
         #to rewrite with bands in database
         table = Table.read(photo_file)
@@ -629,10 +623,11 @@ def plot_result(CIGALE_parameters, line_dict_fit = None, title = None):
         if len(results[param].unique()) > 1:
             to_hist.append(param)
     to_plot_hist = results[to_hist]
-    n_rows = np.int(np.sqrt(len(to_plot_hist.columns))) + 1
-    n_cols = np.int(np.sqrt(len(to_plot_hist.columns))) +1
+    n_rows = np.int(np.sqrt(len(to_plot_hist.columns))) 
+    n_cols = np.int(np.sqrt(len(to_plot_hist.columns)))+ 1
     
     fig,axes = plt.subplots(nrows = n_rows, ncols = n_cols)
+
     for i, column in enumerate(to_plot_hist.columns):
         #plt.figure()
         sns.histplot(x=to_plot_hist[column].astype(str), 

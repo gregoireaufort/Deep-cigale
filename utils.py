@@ -9,8 +9,10 @@ Created on Mon May 25 13:06:15 2020
 
 import numpy as np
 from scipy.interpolate import griddata
+import scipy.stats as stats
 import matplotlib.pyplot as plt
 from math import gamma
+from GMM import Mixture_gaussian_discrete
 from scipy.special import xlogy
 
 class theta_params(object):
@@ -204,3 +206,44 @@ def compute_perplexity(weights):
     norm_weights = weights / np.sum(weights)
     perp = -np.sum(xlogy(norm_weights,norm_weights))  
     return np.exp(perp)/len(weights)
+
+
+def initialize_TAMIS(CIGALE_parameters,
+                     ESS_tol= None,
+                     n_comp=4,
+                     T_max = 30,
+                     n_sample_it=500,
+                     alpha= 80,
+                     verbose = True):
+    dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
+    n_comp = 4 #arbitrary
+    ESS_tol = 100*dim_prior 
+    proposal = Mixture_gaussian_discrete
+    n_sample = [n_sample_it]*T_max
+
+    var0 = [3]*dim_prior
+    init_mean = stats.uniform.rvs(size =(n_comp,dim_prior),loc=-1,scale = 2 )
+    # need to create a probability vector associated with each discrete parameter
+    tst = [len(CIGALE_parameters["module_parameters_discrete"][name]) for
+           name in CIGALE_parameters["module_parameters_discrete"].keys()]
+    [[1/i]*i for i in tst]
+    probs = [[1/i]*i for i in tst]
+    
+    init = [init_mean,
+             np.array([np.diag(var0)]*n_comp),
+             np.ones((n_comp,))/n_comp,
+             probs]
+    init_theta= theta_params_discrete(init)
+
+    TAMIS_parameters = {'dim_prior' : dim_prior,
+                        'n_comp' : n_comp,
+                        'ESS_tol' : ESS_tol,
+                        'proposal' : proposal,
+                        'T_max' : T_max,
+                        'n_sample' : n_sample,
+                        'init_theta' : init_theta,
+                        'alpha':alpha,
+                        "verbose" : True
+        
+    }
+    return TAMIS_parameters

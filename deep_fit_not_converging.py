@@ -95,11 +95,11 @@ CIGALE_parameters = {"module_list":module_list,
 
 dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
 n_comp = 4 #arbitrary
-ESS_tol = 300*dim_prior 
+ESS_tol = 100*dim_prior 
 proposal = Mixture_gaussian_discrete
-T_max = 20
-n_sample = [1000]*T_max
-alpha = 100
+T_max = 30
+n_sample = [500]*T_max
+alpha = 80
 
 #NEED TO AUTOMATE THIS PART, USELESS TO SET UP
 var0 = [3]*dim_prior
@@ -131,11 +131,11 @@ TAMIS_parameters = {'dim_prior' : dim_prior,
 np.random.seed(42)
 
 
-result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters)
+# result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters)
 
-SED_statistical_analysis.plot_result(CIGALE_parameters,
-                                      line_dict_fit = fit_jorge,
-                                      title = "CIGALE Jorge 1 spectro")
+# SED_statistical_analysis.plot_result(CIGALE_parameters,
+#                                       line_dict_fit = fit_jorge,
+#                                       title = "CIGALE Jorge 1 spectro")
 
 
 module_list_normal = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
