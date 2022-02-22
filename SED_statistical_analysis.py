@@ -598,7 +598,10 @@ def line_drawer(x=None,y=None, hue = None, line_dict = None, line_color = 'r',**
             ax.axvline(line_dict[x.name],0,1,color = line_color)
     return ax
 
-def plot_result(CIGALE_parameters, line_dict_fit = None, title = None):
+def plot_result(CIGALE_parameters,
+                line_dict_fit = None,
+                title = None,
+                savefile = None):
     ### MANQUE line_drawer...
     
     
@@ -618,6 +621,11 @@ def plot_result(CIGALE_parameters, line_dict_fit = None, title = None):
         g.map_diag(sns.kdeplot,fill = False, weights =results["weights"],levels = 5)
         g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
         g.fig.suptitle(title)
+    
+    if title :
+        plt.suptitle(title)
+    if savefile:
+        plt.savefig(savefile[:len(savefile)-4] + '_cont.png')
     to_hist = []
     for param in CIGALE_parameters["module_parameters_discrete"]:
         if len(results[param].unique()) > 1:
@@ -637,6 +645,8 @@ def plot_result(CIGALE_parameters, line_dict_fit = None, title = None):
         #plt.show()
     if title :
         plt.suptitle(title)
+    if savefile:
+        plt.savefig(savefile)
         
 def analyse_results(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])

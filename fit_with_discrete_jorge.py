@@ -97,7 +97,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
                     "bands" :bands,
-                    "mode" : ["spectro"],
+                    "mode" : ["photo"],
                     "n_jobs" : 10}
 
 dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
@@ -154,7 +154,7 @@ CIGALE_parameters_normal = {"module_list":module_list_normal,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
                     "bands" :bands,
-                    "mode" : ["spectro"],
+                    "mode" : ["photo"],
                     "n_jobs" : 10}
 np.random.seed(42)
 
