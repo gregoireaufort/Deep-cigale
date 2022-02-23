@@ -212,6 +212,8 @@ def sample_to_cigale_input(sample,
 def cigale(params_input_cigale,CIGALE_parameters,warehouse):
     photo, spectro, lines = np.ones(2),np.ones(2),np.ones(2)
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
+    if CIGALE_parameters["infos_to_save"]:
+        infos = [SED.info[prop] for prop in CIGALE_parameters["infos_to_save"]]
     if "photo" in CIGALE_parameters["mode"]:
         photo = np.array([SED.compute_fnu(band) for band in CIGALE_parameters['bands']])
 
@@ -235,7 +237,7 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
         lines = lines
     elif "lines" not in CIGALE_parameters["mode"]:
         lines = np.ones(2)
-    return  photo,np.array(spectro), lines
+    return  photo,np.array(spectro), lines, infos
     
 def scale_factor_pre_computation(target_photo,
                                  cov_photo,
@@ -298,12 +300,13 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         SED_photo = SED[0]
         SED_spectro = SED[1]
         SED_lines = SED[2]
+        SED_info = SED[3]
         constant = compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
         scaled_photo = constant*SED_photo
         scaled_spectro = constant*SED_spectro
         scaled_lines = constant*SED_lines
         
-        return scaled_photo,scaled_spectro, scaled_lines
+        return scaled_photo,scaled_spectro, scaled_lines,SED_info
     with mp.Pool(processes=n_jobs) as pool:
         computed = pool.map(_compute_scaled_SED, cigale_input)
     # MARCHE PAS computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale ) for input_cigale in cigale_input)
@@ -312,7 +315,8 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
     scaled_photo = [res[0] for res in computed]
     scaled_spectro = [res[1] for res in computed]
     scaled_lines = [res[2] for res in computed]
-    return scaled_photo,scaled_spectro, scaled_lines
+    SED_info =[res[3] for res in computed]
+    return scaled_photo,scaled_spectro, scaled_lines, SED_info 
 
 
 
@@ -393,7 +397,7 @@ class target_SED(object):
         constants = self.pre_computed_constants
         CIGALE_parameters = self.CIGALE_parameters
         warehouse = self.warehouse
-        scaled_SED_photo,scaled_SED_spectro,scaled_SED_lines= compute_scaled_SED(sample,
+        scaled_SED_photo,scaled_SED_spectro,scaled_SED_lines,infos= compute_scaled_SED(sample,
                                                                  constants,
                                                                  weight_spectro,
                                                                  CIGALE_parameters,
