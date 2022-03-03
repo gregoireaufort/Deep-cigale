@@ -37,7 +37,7 @@ def rescale(sample,minimum,maximum):
 
 
 
-def extract_lines(params,wave,spec):
+def extract_lines(params,wave,spec,restframe = False):
     """
     Integrate emission lines and separate them from the continuum
 
@@ -47,6 +47,8 @@ def extract_lines(params,wave,spec):
         CIGALE parameters
     spectre : array like
         observed spectrum
+    restframe : Boolean
+        True if the spectrum is at z=0 (for CIGALE outputs)
 
     Returns
     -------
@@ -56,8 +58,11 @@ def extract_lines(params,wave,spec):
         new_wave : wavelength of the spectrum without emission lines
 
     """
+    if restframe:
+        lines_waves = params["nebular"]["line_waves"]
+    else : 
+        lines_waves = params["nebular"]["line_waves"] * (1+params["redshift"])
     width = params["nebular"]["lines_width"]
-    lines_waves = params["nebular"]["line_waves"]
     limits = [(line - 3. * (line *width * 1e3 / cst.c),line + 3. *  (line *width * 1e3 / cst.c)) for line in lines_waves]
     lines = [limit_spec(wave,spec,limit[0],limit[1]) for limit in limits]
     wave_to_remove = np.unique(np.array(list(chain(*[line[0] for line in lines]))))
@@ -225,7 +230,8 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
         L_max =CIGALE_parameters['wavelength_limits']["max"]
         new_spec, new_wave,lines = extract_lines(CIGALE_parameters,
                                                  wavelength,
-                                                 spectrum)
+                                                 spectrum,
+                                                 True)
         lim_wave, lim_spec = limit_spec(new_wave,
                                         new_spec,
                                         L_min,
@@ -348,7 +354,8 @@ def extract_target(observed_galaxy,CIGALE_parameters):
                                                  CIGALE_parameters)
         target_spectro,wave_spectro,_ = extract_lines(CIGALE_parameters,
                                                     wave_spectro,
-                                                    target_spectro)
+                                                    target_spectro,
+                                                    False)
         wave_spectro,target_spectro = binning_flux(wave_spectro,
                              target_spectro,
                              CIGALE_parameters['n_bins'],
@@ -435,7 +442,6 @@ class target_SED(object):
         projected in R^dim
         """
         dim_cont = len(self.CIGALE_parameters['module_parameters_to_fit'])
-        dim_disc = len(self.CIGALE_parameters['module_parameters_discrete'])
         var0 = [1]*dim_cont
         logprior_cont = stats.multivariate_normal.logpdf(sample[:,:dim_cont],
                                                     mean = np.zeros((dim_cont,)),
