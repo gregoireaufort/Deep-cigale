@@ -212,8 +212,10 @@ def sample_to_cigale_input(sample,
 def cigale(params_input_cigale,CIGALE_parameters,warehouse):
     photo, spectro, lines = np.ones(2),np.ones(2),np.ones(2)
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
-    if CIGALE_parameters["infos_to_save"]:
+    if "infos_to_save" in CIGALE_parameters.keys() :
         infos = [SED.info[prop] for prop in CIGALE_parameters["infos_to_save"]]
+    else : 
+        infos = None
     if "photo" in CIGALE_parameters["mode"]:
         photo = np.array([SED.compute_fnu(band) for band in CIGALE_parameters['bands']])
 
@@ -654,16 +656,24 @@ def plot_result(CIGALE_parameters,
         
 def analyse_results(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
-    to_plot=results[CIGALE_parameters["module_parameters_to_fit"]]
     
+    to_analyse=list(CIGALE_parameters["module_parameters_to_fit"].keys())
+    
+    disc = []
+    for param in CIGALE_parameters["module_parameters_discrete"].keys():
+        if len(results[param].unique()) > 1:
+            disc.append(param)
+    
+    to_analyse+=disc
+    weighted_stats = DescrStatsW(results[to_analyse], weights = results["weights"])
     res = {}
-    for col in to_plot.columns:
-        weighted_stats = DescrStatsW(to_plot[col], weights = results["weights"])
+    for col in to_analyse:
+        weighted_stats = DescrStatsW(results[col], weights = results["weights"])
         res[col]  = {"mean":weighted_stats.mean,
                      "var":weighted_stats.var,
                      "sd" :weighted_stats.std,
-                     #"95% credible interval":np.array(weighted_stats.quantile([0.05,0.95])),
-                     "max":to_plot[results["MAP"]==1][col].array[0],
+                     "1D 95% credible interval":np.array(weighted_stats.quantile([0.05,0.95])),
+                     "max":results[results["MAP"]==1][col].array[0],
                      }
     return res
 
