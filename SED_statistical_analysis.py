@@ -61,7 +61,7 @@ def extract_lines(params,wave,spec,restframe = False):
     if restframe:
         lines_waves = params["nebular"]["line_waves"]
     else : 
-        lines_waves = params["nebular"]["line_waves"] * (1+params["redshift"])
+        lines_waves = np.array(params["nebular"]["line_waves"]) * (1+params["module_parameters_discrete"]["redshift"][0])
     width = params["nebular"]["lines_width"]
     limits = [(line - 3. * (line *width * 1e3 / cst.c),line + 3. *  (line *width * 1e3 / cst.c)) for line in lines_waves]
     lines = [limit_spec(wave,spec,limit[0],limit[1]) for limit in limits]
@@ -217,8 +217,14 @@ def sample_to_cigale_input(sample,
 def cigale(params_input_cigale,CIGALE_parameters,warehouse):
     photo, spectro, lines = np.ones(2),np.ones(2),np.ones(2)
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
+    mass_proportional = SED.mass_proportional_info
     if "infos_to_save" in CIGALE_parameters.keys() :
-        infos = [SED.info[prop] for prop in CIGALE_parameters["infos_to_save"]]
+
+        info_mass =[info for info in CIGALE_parameters["infos_to_save"] if info in mass_proportional] 
+        rest = [info for info in CIGALE_parameters["infos_to_save"] if info not in mass_proportional] 
+        im = {prop:SED.info[prop] for prop in info_mass}
+        ir = {prop:SED.info[prop] for prop in rest}
+        infos = (im,ir)
     else : 
         infos = None
     if "photo" in CIGALE_parameters["mode"]:
@@ -308,23 +314,34 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         SED_photo = SED[0]
         SED_spectro = SED[1]
         SED_lines = SED[2]
-        SED_info = SED[3]
+        SED_info_mass= SED[3][0]
+        SED_info = SED[3][1]
         constant = compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
         scaled_photo = constant*SED_photo
         scaled_spectro = constant*SED_spectro
         scaled_lines = constant*SED_lines
+        scaled_info = {n: constant * SED_info_mass[n] for n in SED_info_mass.keys()}
         
-        return scaled_photo,scaled_spectro, scaled_lines,SED_info
+        
+        return scaled_photo,scaled_spectro, scaled_lines,(SED_info,scaled_info)
     with mp.Pool(processes=n_jobs) as pool:
         computed = pool.map(_compute_scaled_SED, cigale_input)
     # MARCHE PAS computed = Parallel(n_jobs = n_jobs)(delayed(_compute_scaled_SED)(input_cigale ) for input_cigale in cigale_input)
                                                                      
-    #computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
+    # computed = [_compute_scaled_SED(input_cigale) for input_cigale in cigale_input]
     scaled_photo = [res[0] for res in computed]
     scaled_spectro = [res[1] for res in computed]
     scaled_lines = [res[2] for res in computed]
-    SED_info =[res[3] for res in computed]
-    return scaled_photo,scaled_spectro, scaled_lines, SED_info 
+    if "infos_to_save" in CIGALE_parameters.keys() :
+
+        SED_info =[dict(res[3][0],**res[3][1]) for res in computed]
+        
+        result_dict  = {}
+        for k in SED_info[0].keys():
+          result_dict[k] = tuple(d[k] for d in SED_info)
+        store = pd.DataFrame.from_dict(SED_info)
+        store.to_csv(CIGALE_parameters["file_store"][:-4]+"_infos.csv",mode ='a',index = False)
+    return scaled_photo,scaled_spectro, scaled_lines
 
 
 
@@ -406,7 +423,7 @@ class target_SED(object):
         constants = self.pre_computed_constants
         CIGALE_parameters = self.CIGALE_parameters
         warehouse = self.warehouse
-        scaled_SED_photo,scaled_SED_spectro,scaled_SED_lines,infos= compute_scaled_SED(sample,
+        scaled_SED_photo,scaled_SED_spectro,scaled_SED_lines= compute_scaled_SED(sample,
                                                                  constants,
                                                                  weight_spectro,
                                                                  CIGALE_parameters,
@@ -453,6 +470,11 @@ def create_output_files(CIGALE_parameters,result):
     parameters = pd.read_csv(CIGALE_parameters['file_store'])
     name_col = parameters.columns[0]
     clean = parameters.drop(parameters[parameters[name_col]==name_col].index)
+    if CIGALE_parameters["infos_to_save"] is not None:
+        infos = pd.read_csv(CIGALE_parameters['file_store'][:-4]+'_infos.csv')
+        name_col = infos.columns[0]
+        clean_infos =infos.drop(infos[infos[name_col]==name_col].index)
+        clean = pd.concat([clean, clean_infos], axis=1, join="inner")
     clean["weights"] = result.final_weights
     temp = np.zeros(len(result.final_weights))
     temp[result.max_target] = 1
@@ -463,7 +485,10 @@ def create_output_files(CIGALE_parameters,result):
 def check_output_file(CIGALE_parameters):
     while os.path.exists(CIGALE_parameters['file_store']):
         CIGALE_parameters['file_store'] =  CIGALE_parameters['file_store'].replace(".csv","_1.csv")
-        
+
+# def add_infos_res(CIGALE_parameters,infos):
+#     parameters = pd.read_csv(CIGALE_parameters['file_store'])
+#     parameters[]
 def fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters):
     module_list = CIGALE_parameters['module_list']
     #warehouse = SedWarehouse(nocache ='deep_nebular' )
