@@ -11,7 +11,10 @@ from astropy.io import fits
 
 import scipy.stats as stats
 from utils import *
-
+import pandas as pd
+import pcigale
+from pcigale.warehouse import SedWarehouse
+import matplotlib.pyplot as plt
 
 import numpy as np
 
@@ -64,7 +67,8 @@ module_parameters_discrete = {'sfr_A' : [1.],
 wavelength_limits = {"min" :  galaxy_obs["spectroscopy_wavelength"][0],"max" : galaxy_obs["spectroscopy_wavelength"][-1]}
 
 
-wavelength_lines =[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
+#wavelength_lines =[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
+wavelength_lines=[486.1,121.6]
 nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
 
 module_list = ['sfhdelayed', 'bc03','nebular','dustatt_modified_starburst','dl2014', 'redshifting']
@@ -93,24 +97,12 @@ result = SED_statistical_analysis.fit(galaxy_obs , CIGALE_parameters, TAMIS_para
 
 
 
-def compare_SED(parameter_list,obs,CIGALE_params):
+#def compare_SED(parameter_list,obs,CIGALE_params):
+
     
-def plot_best_SED(CIGALE_parameters,obs):
+def compute_const_plot(CIGALE_parameters,galaxy_obs):
     
-    
-    results_read = pd.read_csv(CIGALE_parameters["file_store"])
-    n_bins = CIGALE_parameters["n_bins"]
-    param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
-    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
-    parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
-    lim_wave, lim_err = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
-                                galaxy_obs["spectroscopy_err"],
-                                CIGALE_parameters['wavelength_limits']["min"],
-                                CIGALE_parameters['wavelength_limits']["max"])
-    warehouse = SedWarehouse(nocache = module_list)
-    SED = SED_statistical_analysis.cigale(parameter_list, CIGALE_parameters,warehouse)
-    
-    targ_covar = SED_statistical_analysis.extract_target(obs,CIGALE_parameters)
+    targ_covar = SED_statistical_analysis.extract_target(galaxy_obs,CIGALE_parameters)
     target_photo, target_lines, = targ_covar[0:2]
     target_spectro, covar_photo = targ_covar[2:4]
     covar_spectro, covar_lines = targ_covar[4:6]
@@ -119,32 +111,83 @@ def plot_best_SED(CIGALE_parameters,obs):
                                                                      target_spectro,
                                                                      covar_spectro,
                                                                      CIGALE_parameters["mode"])
-    _, lim_flux = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
-                                galaxy_obs["spectroscopy_fluxes"],
+    return constants
+
+def plot_obs(CIGALE_parameters,galaxy_obs):
+    f,ax = plt.subplots()
+    n_bins = CIGALE_parameters["n_bins"]
+    targ_covar = SED_statistical_analysis.extract_target(galaxy_obs,CIGALE_parameters)
+    target_photo, target_lines, = targ_covar[0:2]
+    target_spectro, covar_photo = targ_covar[2:4]
+    covar_spectro, covar_lines = targ_covar[4:6]
+    lim_wave,_ = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
+                                galaxy_obs["spectroscopy_err"],
                                 CIGALE_parameters['wavelength_limits']["min"],
                                 CIGALE_parameters['wavelength_limits']["max"])
-    wave_to_plot , bin_flux = SED_statistical_analysis.binning_flux(lim_wave,
-                                                                    lim_flux, 
-                                                                    n_bins,
-                                                                    CIGALE_parameters['wavelength_limits']["min"],
-                                CIGALE_parameters['wavelength_limits']["max"])
+    wave_to_plot = np.linspace(start = lim_wave[0],
+                                           stop = lim_wave[-1],
+                                           num = n_bins)
+    
+    yerr = np.array(np.sqrt(np.diag(covar_spectro)))*1.96
+    ax.errorbar(x=wave_to_plot,y=target_spectro,yerr=yerr, color = "red")
+    
+    return ax,wave_to_plot
 
-    bin_wave,bin_err = SED_statistical_analysis.binning_variances(lim_wave,
-                                                                  lim_err**2,
-                                                                  n_bins,
-                                                                  CIGALE_parameters['wavelength_limits']["min"],
-                                CIGALE_parameters['wavelength_limits']["max"])
-
-    weight_spectro = 1
+def add_sim_plot(ax,
+                 wave,
+                 params_list,
+                 CIGALE_parameters,warehouse,
+                 color = "blue", 
+                 alpha = 1):
+    SED = SED_statistical_analysis.cigale(params_list, CIGALE_parameters,warehouse)
     SED_photo = SED[0]
     SED_spectro = SED[1]
+    weight_spectro = 1
+    constants = compute_const_plot(CIGALE_parameters,galaxy_obs)
     constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
     scaled_spectro = constant*SED_spectro
+    ax.plot(wave,scaled_spectro, color,alpha = alpha)
     
-    yerr = np.array(np.sqrt(bin_err))*1.96
-    plt.errorbar(x=wave_to_plot,y=bin_flux,yerr=yerr, color = "red")
-    plt.plot(wave_to_plot,scaled_spectro)
-    plt.xscale("log")
+    return ax
+
+def plot_best_SED(CIGALE_parameters,galaxy_obs):
+    results_read = pd.read_csv(CIGALE_parameters["file_store"])   
+    param_frame = results_read[results_read["MAP"]==1].iloc[0].to_dict()
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+    parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+  
+    warehouse = SedWarehouse()
+    ax,wave = plot_obs(CIGALE_parameters,galaxy_obs)
+    add_sim_plot(ax,wave,parameter_list,CIGALE_parameters,warehouse)
+    plt.show()
+    
     return None
+
+def plot_posterior_predictive(CIGALE_parameters,galaxy_obs,n):
+    
+    
+    ax,wave=plot_obs(CIGALE_parameters,galaxy_obs)
+    modules_params = [list(pcigale.sed_modules.get_module(module,blank = True).parameter_list.keys()) for module in CIGALE_parameters['module_list']]
+    warehouse = SedWarehouse()
+    constants = compute_const_plot(CIGALE_parameters,galaxy_obs)
+    results_read = pd.read_csv(CIGALE_parameters["file_store"])
+    idxs =np.random.choice(range(len(results_read["weights"])), p = results_read["weights"], size = n)
+    norm_weights = results_read["weights"].iloc[idxs]/np.sum(results_read["weights"].iloc[idxs])
+    sims_to_plot = []
+    for idx in idxs:
+        param_frame = results_read.iloc[idx].to_dict()
+        parameter_list =[{param:param_frame[param] for param in module_params} for module_params in modules_params]
+        add_sim_plot(ax,
+                 wave,
+                 parameter_list,
+                 CIGALE_parameters,
+                 warehouse,
+                 color = "blue", 
+                 alpha =  results_read["weights"].iloc[idx]/np.sum(results_read["weights"].iloc[idxs]))
+      
+    plt.show()
+    
+    
 plot_best_SED(CIGALE_parameters,galaxy_obs)
 
+plot_posterior_predictive(CIGALE_parameters,galaxy_obs,500)

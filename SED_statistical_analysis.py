@@ -534,7 +534,7 @@ def read_spectro_moons(file):
     noise_array =  hdul[8].data
     wave = np.linspace(hdul[0].header["WMIN"],
                        hdul[0].header["WMAX"],
-                       len(noisy))
+                       len(noisy))/10 #ANGSTROM TO NM !
     redshift = hdul[0].header["Z"]
     return noisy,noise_array,wave, redshift
 
