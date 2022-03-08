@@ -226,7 +226,7 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
         ir = {prop:SED.info[prop] for prop in rest}
         infos = (im,ir)
     else : 
-        infos = None
+        infos = (None,None)
     if "photo" in CIGALE_parameters["mode"]:
         photo = np.array([SED.compute_fnu(band) for band in CIGALE_parameters['bands']])
 
@@ -433,11 +433,28 @@ class target_SED(object):
         log_likelihood_spectro = 0
         #We switch mean and x for vectorization
         if "photo" in CIGALE_parameters["mode"]:
+            log_likelihood_photo_i = 0
+            log_likelihood_photo_s = 0
+            if "lim inf" in CIGALE_parameters : #We have a lower bound on thevalue
+                idx = CIGALE_parameters["lim inf"] 
+                lim_inf  = [SED[idx] for SED in scaled_SED_photo]
+                log_likelihood_photo_i =  np.sum(stats.norm.logsf(x=lim_inf,
+                                                                    loc = target_photo[idx],
+                                                                    scale = covar_photo[idx,idx],
+                                                                    allow_singular = True))
+            if "lim sup" in CIGALE_parameters:
+                idx = CIGALE_parameters["lim sum"] 
+                lim_sup  = [SED[idx] for SED in scaled_SED_photo]
+                log_likelihood_photo_s =  np.sum(stats.norm.logcdf(x=lim_sup,
+                                                                    loc = target_photo[idx],
+                                                                    scame = covar_photo[idx,idx],
+                                                                    allow_singular = True))
+            
             log_likelihood_photo = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_photo,
                                                                              mean = target_photo,
                                                                              cov = covar_photo,
                                                                              allow_singular = True))
-
+            log_likelihood_photo+=log_likelihood_photo_s +log_likelihood_photo_i 
         if "spectro" in CIGALE_parameters["mode"]:
             log_likelihood_spectro = np.array(stats.multivariate_normal.logpdf(x=scaled_SED_spectro,
                                                                                mean = target_spectro,
