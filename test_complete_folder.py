@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Tue Feb 22 13:26:45 2022
@@ -66,6 +65,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "deep_modules":None,
                     "module_parameters_to_fit":module_parameters_to_fit,
                     "module_parameters_discrete":module_parameters_discrete,
+                    "infos_to_save":['sfh.sfr','stellar.m_star'],
                     "n_bins":20,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
@@ -73,7 +73,7 @@ CIGALE_parameters = {"module_list":module_list,
                     "mode" : ["spectro"],
                     "n_jobs" : 10}
 
-def fit(file,CIGALE_parameters):
+def fit(file,CIGALE_parameters,failed):
     galaxy_obs =SED_statistical_analysis.read_galaxy_moons(file, 
                  None,
                  ident =None)
@@ -92,17 +92,18 @@ def fit(file,CIGALE_parameters):
                                                  CIGALE_parameters,
                                                  TAMIS_parameters)
     
-    
-    SED_statistical_analysis.plot_result(CIGALE_parameters,
-                                      title = file[33:len(file)-4],
-                                      savefile = "test_moons/plots/"+file[33:len(file)-4])
-     
+    try:
+        SED_statistical_analysis.plot_result(CIGALE_parameters,
+                                             title = file[33:len(file)-4],
+                                             savefile = "test_moons/plots/"+file[33:len(file)-4])
+    except:
+        failed.append(CIGALE_parameters)
+
 def fit_all_folder(folder_path):
     list_files = glob.glob(folder_path+"*") 
+    failed_plots = []
     for file in list_files:
-        fit(file, CIGALE_parameters)
-file = "test_moons/ID_302327_ETC_output/ID_302327_BC03_z0.69_v60.00_m24.1_nexp8_HR_RI.fits"
-fit(file,CIGALE_parameters)
-
-
-fit_all_folder("test_moons/ID_302327_ETC_output/")
+        fit(file, CIGALE_parameters,failed_plots)
+    return failed_plots
+#
+to_plot_after = fit_all_folder("test_moons/ID_302327_ETC_output/")
