@@ -638,6 +638,39 @@ def read_galaxy_moons(spectro_file, photo_file, ident = None):
     return observed_galaxy
 
 
+def galaxy_Jorge(phot,spec,wave,z,ident = None,SNR_photo = 3, SNR_spectro = 3):
+    photo_flux = None
+    photo_err = None
+    spec_flux = None
+    spec_err = None
+    spec_wavelength = None
+    bands = None
+    photo_flux = phot.loc[ident]
+    bands = list(photo_flux.keys())
+    photo_err =  photo_flux/SNR_photo
+    z = z.loc[ident]
+    spec_flux =  spec.loc[ident]
+    spec_wavelength = wave.loc[ident]
+    spec_err = spec_flux/ SNR_spectro
+    noised_photo = photo_flux*(1+stats.norm.rvs(size =len(photo_flux),
+                                               loc = 0,
+                                               scale = 1/SNR_photo,
+                                               random_state=ident))
+    noised_spec =spec_flux*(1+stats.norm.rvs(size =len(spec_flux),
+                                             loc = 0,
+                                             scale = 1/SNR_spectro,
+                                             random_state=ident + 3))
+
+    observed_galaxy  = {"spectroscopy_wavelength":np.array(spec_wavelength),
+                        "spectroscopy_fluxes":np.array(spec_flux), #TO SEE IF BUG SOMEWHERE
+                        "spectroscopy_err" : np.array(spec_err),
+                        "photometry_fluxes" : np.array(photo_flux), #TO SEE IF BUG SOMEWHERE
+                        "photometry_err" :np.array(photo_err),
+                        "bands" : bands,
+                        "redshift" : np.array(z)
+                        }
+    return observed_galaxy
+
 def split_name_params(columns):
     new_columns = []
     for col in columns:
@@ -688,19 +721,47 @@ def plot_result(CIGALE_parameters,
     n_rows = np.int(np.sqrt(len(to_plot_hist.columns))) 
     n_cols = np.int(np.sqrt(len(to_plot_hist.columns)))+ 1
     
-    fig,axes = plt.subplots(nrows = n_rows, ncols = n_cols)
-
+    fig,axes = plt.subplots(nrows = n_rows, ncols = n_cols) 
+    plt.subplots_adjust(hspace = 0.9,wspace=  0.5)
+    #fig.autofmt_xdate()
     for i, column in enumerate(to_plot_hist.columns):
         #plt.figure()
-        sns.histplot(x=to_plot_hist[column].astype(str), 
-                     weights =results["weights"], 
-                     kde= False,
+        weights = [np.sum(results["weights"][to_plot_hist[column]==i]) for
+                   i in np.unique(to_plot_hist[column])]
+        ax=sns.barplot(x=np.unique(to_plot_hist[column]), 
+                     y =weights, 
                      ax = axes[i//n_cols,i%n_cols])
+        ax.set(xlabel=column)
+        ax.set(ylim = (0,1))
+        show_values(ax)
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(45)
         #plt.show()
     if title :
         plt.suptitle(title)
     if savefile:
         plt.savefig(savefile)
+
+def show_values(axs, orient="v", space=.01):
+    def _single(ax):
+        if orient == "v":
+            for p in ax.patches:
+                _x = p.get_x() + p.get_width() / 2
+                _y = p.get_y() + p.get_height() + (p.get_height()*0.01)
+                value = '{:.2f}'.format(p.get_height())
+                ax.text(_x, _y, value, ha="center",rotation=90) 
+        elif orient == "h":
+            for p in ax.patches:
+                _x = p.get_x() + p.get_width() + float(space)
+                _y = p.get_y() + p.get_height() - (p.get_height()*0.5)
+                value = '{:.2f}'.format(p.get_width())
+                ax.text(_x, _y, value, ha="left",rotation=90)
+
+    if isinstance(axs, np.ndarray):
+        for idx, ax in np.ndenumerate(axs):
+            _single(ax)
+    else:
+        _single(axs)
         
 def analyse_results(CIGALE_parameters):
     results = pd.read_csv(CIGALE_parameters["file_store"])
