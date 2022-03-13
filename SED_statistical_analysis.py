@@ -36,42 +36,6 @@ def rescale(sample,minimum,maximum):
     return sample*(maximum-minimum) + minimum
 
 
-
-def extract_lines(params,wave,spec,restframe = False):
-    """
-    Integrate emission lines and separate them from the continuum
-
-    Parameters
-    ----------
-    params : dictionnary
-        CIGALE parameters
-    spectre : array like
-        observed spectrum
-    restframe : Boolean
-        True if the spectrum is at z=0 (for CIGALE outputs)
-
-    Returns
-    -------
-    tuple
-        integrated_lines : emission lines
-        continuum : spectrum without the emission lines
-        new_wave : wavelength of the spectrum without emission lines
-
-    """
-    if restframe:
-        lines_waves = params["nebular"]["line_waves"]
-    else : 
-        lines_waves = np.array(params["nebular"]["line_waves"]) * (1+params["module_parameters_discrete"]["redshift"][0])
-    width = params["nebular"]["lines_width"]
-    limits = [(line - 3. * (line *width * 1e3 / cst.c),line + 3. *  (line *width * 1e3 / cst.c)) for line in lines_waves]
-    lines = [limit_spec(wave,spec,limit[0],limit[1]) for limit in limits]
-    wave_to_remove = np.unique(np.array(list(chain(*[line[0] for line in lines]))))
-    integrated_lines = [np.trapz(C[1],C[0]) for C in lines]
-    continuum =  np.delete(spec,np.in1d(wave, wave_to_remove))
-    new_wave = np.delete(wave,np.in1d(wave, wave_to_remove))
-    return continuum, new_wave, integrated_lines
-
-
 def window_averaging(wavelength,spectrum):
      if len(spectrum) >1:
          delta_lambda = wavelength[1:] - wavelength[:-1] 
@@ -133,6 +97,42 @@ def binning_variances(wavelength, variances, n_bins,L_min,L_max):
     wave_binned = [np.mean(wavelength[idx == i]) for i in range(1,n_bins+1)]
     return wave_binned,variances_binned
 
+
+def extract_lines(params,wave,spec,restframe = False):
+    """
+    Integrate emission lines and separate them from the continuum
+
+    Parameters
+    ----------
+    params : dictionnary
+        CIGALE parameters
+    spectre : array like
+        observed spectrum
+    restframe : Boolean
+        True if the spectrum is at z=0 (for CIGALE outputs)
+
+    Returns
+    -------
+    tuple
+        integrated_lines : emission lines
+        continuum : spectrum without the emission lines
+        new_wave : wavelength of the spectrum without emission lines
+
+    """
+    if restframe:
+        lines_waves = params["nebular"]["line_waves"]
+    else : 
+        lines_waves = np.array(params["nebular"]["line_waves"]) * (1+params["module_parameters_discrete"]["redshift"][0])
+    width = params["nebular"]["lines_width"]
+    limits = [(line - 3. * (line *width * 1e3 / cst.c),line + 3. *  (line *width * 1e3 / cst.c)) for line in lines_waves]
+    lines = [limit_spec(wave,spec,limit[0],limit[1]) for limit in limits]
+    wave_to_remove = np.unique(np.array(list(chain(*[line[0] for line in lines]))))
+    integrated_lines = [np.trapz(C[1],C[0]) for C in lines]
+    continuum =  np.delete(spec,np.in1d(wave, wave_to_remove))
+    new_wave = np.delete(wave,np.in1d(wave, wave_to_remove))
+    return continuum, new_wave, integrated_lines
+
+
 def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
     width = CIGALE_parameters["nebular"]["lines_width"]
     wave = observed_galaxy["spectroscopy_wavelength"]
@@ -144,21 +144,26 @@ def compute_covar_spectro(observed_galaxy, CIGALE_parameters):
                                     L_min,
                                     L_max)
     
+    
+    limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c),
+               line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for
+              line_wave in CIGALE_parameters["nebular"]["line_waves"]]
+    lines = [limit_spec(wave,err,limit[0],limit[1]) for limit in limits]
+    wave_to_remove = np.array(list(chain(*[line[0] for line in lines])))
+    err_to_remove = err[np.in1d(wave, wave_to_remove)]
+   
+    lim_err =  np.setdiff1d(lim_err,err_to_remove)
+    lim_wave = np.setdiff1d(lim_wave,wave_to_remove)
     if "lines" in CIGALE_parameters["mode"]:
-        limits = [(line_wave - 3. * (line_wave *width * 1e3 / cst.c), line_wave + 3. *  (line_wave *width * 1e3 / cst.c)) for line_wave in CIGALE_parameters["nebular"]["line_waves"]]
-        lines = [limit_spec(wave,err,limit[0],limit[1]) for limit in limits]
-        wave_to_remove = np.array(list(chain(*[line[0] for line in lines])))
-        err_to_remove = err[np.in1d(wave, wave_to_remove)]
-        #covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
-        lim_err =  np.setdiff1d(lim_err,err_to_remove)
-        lim_wave = np.setdiff1d(lim_wave,wave_to_remove)
-
+         covar_lines = np.array([var_trapz(C[1],C[0]) for C in lines])
+    else :
+        covar_lines = None
     _,covar_continuum = binning_variances(lim_wave, 
                                           lim_err, 
                                           CIGALE_parameters["n_bins"],
                                           L_min,
                                           L_max)
-    return np.diag(covar_continuum)
+    return np.diag(covar_continuum),covar_lines
 
 
 def sample_to_cigale_input(sample,
@@ -379,10 +384,11 @@ def extract_target(observed_galaxy,CIGALE_parameters):
                              CIGALE_parameters['wavelength_limits']["min"],
                              CIGALE_parameters['wavelength_limits']["max"])
         
-        covar_spectro = compute_covar_spectro(observed_galaxy, CIGALE_parameters)
+        covar_spectro,covar_lines = compute_covar_spectro(observed_galaxy,
+                                                          CIGALE_parameters)
     if "lines_fluxes" in observed_galaxy.keys() and "lines" in CIGALE_parameters["mode"]:
         target_lines = observed_galaxy["lines_fluxes"]
-        covar_lines =  np.diag(observed_galaxy["lines_err"]**2)
+        covar_lines =  np.diag(observed_galaxy["lines_err"]**2) #If lines specifically given,
         
         
     return target_photo,target_lines, target_spectro,covar_photo,covar_spectro, covar_lines
