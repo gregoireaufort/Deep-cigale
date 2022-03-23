@@ -209,15 +209,16 @@ def compute_perplexity(weights):
 
 
 def initialize_TAMIS(CIGALE_parameters,
-                     ESS_tol= None,
+                     ESS_tol= 100,
                      n_comp=4,
                      T_max = 30,
                      n_sample_it=500,
                      alpha= 80,
-                     verbose = True):
+                     verbose = True,
+                     recycle = "auto"):
     dim_prior = len(CIGALE_parameters["module_parameters_to_fit"]) #Number of continuous parameters to fit
-    n_comp = 4 #arbitrary
-    ESS_tol = 100*dim_prior 
+    n_comp = n_comp#arbitrary
+    ESS_tol = ESS_tol*dim_prior 
     proposal = Mixture_gaussian_discrete
     n_sample = [n_sample_it]*T_max
 
@@ -243,7 +244,8 @@ def initialize_TAMIS(CIGALE_parameters,
                         'n_sample' : n_sample,
                         'init_theta' : init_theta,
                         'alpha':alpha,
-                        "verbose" : True
+                        "verbose" : verbose,
+                        "recycle" : recycle
         
     }
     return TAMIS_parameters

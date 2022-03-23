@@ -11,6 +11,7 @@ import glob
 import pandas as pd
 from utils import *
 import numpy as np
+import astropy 
 
 np.random.seed(42)
 folder_path ="/home/aufort/Bureau/Deep-cigale/test_Jorge/"
@@ -49,13 +50,13 @@ module_parameters_discrete = {'sfr_A' : [1.],
                              'Ext_law_emission_lines' : [1],
                              'Rv' : [3.1],
                              'imf' : [1],
-                             'metallicity' : [0.02,0.004],
+                             'metallicity' : [0.0004,0.008,0.05,0.02,0.004],
                              'qpah' : [0.47,1.12,1.77,2.5],
                              'umin' : [5.0,10.0,25.0],
                              'alpha' : [2],
                              'gamma' : [0.02],
                              'separation_age': [10],
-                             'logU' :[-3.5,-2.5,-1.5],
+                             'logU' :[ -4.0,-3.5,-3.0, -2.5, -2.0,-1.5,-1.0],
                              'zgas':[0.004,0.008,0.011,0.022,0.007, 0.014],
                              'ne':[100],
                              'f_esc': [0.0],
@@ -84,8 +85,8 @@ CIGALE_parameters = {"module_list":module_list,
                     "n_bins":20,
                     "wavelength_limits" : wavelength_limits,
                     "nebular" :nebular_params,
-                    "bands" :None, #DUMMY
-                    "mode" : ["photo"],
+                    "bands" :list(photo_flux.columns), #DUMMY
+                    "mode" : ["spectro"],
                     "n_jobs" : 10}
 
 
@@ -95,27 +96,27 @@ galaxy_targ = B[0]
 
 
 
-def fit(ident,CIGALE_parameters,failed):
+def fit(ident,CIGALE_parameters,mode,failed):
     galaxy_obs =SED_statistical_analysis.galaxy_Jorge(photo_flux,
                                       spec_flux,
                                       spec_wavelength, 
                                       z,
-                                      ident,
+                                      ident, 
                                       SNR_photo=5,
-                                      SNR_spectro = 5)
+                                      SNR_spectro = 2)
         
     A=astropy.io.fits.open("/home/aufort/Desktop/jorge/results.fits")
     B = A[1].data
     galaxy_targ = B[ident]
 
-    
+
     fit_jorge = {"tau_main" : galaxy_targ["best.sfh.tau_main"],
                     'age_main':galaxy_targ["best.sfh.age_main"],
                       'tau_burst':galaxy_targ["best.sfh.tau_burst"],
                       'f_burst':galaxy_targ["best.sfh.f_burst"],
                       'age_burst':galaxy_targ["best.sfh.age_burst"],
                       'E_BV_lines':galaxy_targ["best.attenuation.E_BV_lines"]}
-    file_store = 'test_Jorge/'+str(ident)+"_photo"+ ".csv"
+    file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+ ".csv"
     wavelength_lines =[10]#[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
     nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
     
@@ -125,34 +126,53 @@ def fit(ident,CIGALE_parameters,failed):
     CIGALE_parameters["bands"] =galaxy_obs["bands"]
     CIGALE_parameters["nebular"] = nebular_params 
     CIGALE_parameters["file_store"] = file_store
-    TAMIS_parameters = initialize_TAMIS(CIGALE_parameters)
+    CIGALE_parameters["mode"] = mode
+    TAMIS_parameters = initialize_TAMIS(CIGALE_parameters, n_comp=4, alpha=100,
+                                        T_max=30, recycle =True)
     result = SED_statistical_analysis.fit(galaxy_obs,
                                                  CIGALE_parameters,
                                                  TAMIS_parameters)
     
     try:
         SED_statistical_analysis.plot_result(CIGALE_parameters,
-                                             title = str(ident)+"_photo",
+                                             title = str(ident)+"_"+str(mode),
                                              line_dict_fit = fit_jorge ,
-                                             savefile = 'test_Jorge/'+str(ident)+"_photo.pdf")
+                                             savefile = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+".pdf")
     except:
         failed.append(CIGALE_parameters)
-        
-        
-        
-fit(3, CIGALE_parameters, [])
+        return result
+    
+failed_plots = []
+fit(0,CIGALE_parameters,["photo"],failed_plots)
+fit(0,CIGALE_parameters,["spectro"],failed_plots)
+fit(0,CIGALE_parameters,["spectro","photo"],failed_plots)
+
+
+failed_plots = []
+for ident in range(50):
+    fit(ident, CIGALE_parameters, failed_plots)
+
+
+#failed_plots
+
+
+#plot_best_SED(CIGALE_parameters,galaxy_obs)
+
+#plot_posterior_predictive(CIGALE_parameters,galaxy_obs,500,
+#                          title = 'test_Jorge/'+str(0)+"_spectro_post_pred.pdf")
 
 
 
 
 
 
+# import pickle 
+# # filehandler = open("test_spectro.pkl", 'wb') 
+# # pickle.dump(result[0], filehandler)
 
 
-
-
-
-
+# filehandler = open("test_spectro.pkl", 'rb') 
+# tst = pickle.load( filehandler)
 
 
 

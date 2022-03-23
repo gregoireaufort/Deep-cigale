@@ -319,10 +319,11 @@ def lpdf_discrete(x,probs):
     return np.array(lpdf)
 
 def rvs_discrete(n,probs):
+
     discrete = [np.random.choice(range(len(probs[i])),
                                      size= n,
                                      replace = True, 
-                                     p = probs[i]/np.sum(probs[i]))
+                                     p = probs[i])
         for i in range(len(probs))]
     return np.array(discrete).T
 
@@ -331,11 +332,19 @@ def update_discrete_probs(sample,weights):
     """
     Assumes the weights are in normalized, and returns probs
     """
+    #We set a threshold st each value has probability p = 1e-5 of 
+    #disappearing at a given iteration
+    n = sample.shape[0]
+    threshold = 1-(1e-5)**(1/n) 
+    
     probs = []
     for i in range(sample.shape[1]):
         n_values = len(np.unique(sample[:,i]))
         P = []
         for value in range(n_values):
-            P.append(np.sum(weights[sample[:,i] == value]) + (1/(10*n_values)))
+            
+            P.append(np.sum(weights[sample[:,i] == value]))
         probs.append(P)
-    return probs
+    new_probs = [ np.array(probs[i])*(1-len(probs[i])*threshold) + threshold for
+             i in range(len(probs))]
+    return new_probs

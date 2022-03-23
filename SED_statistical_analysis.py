@@ -217,8 +217,9 @@ def sample_to_cigale_input(sample,
         deep_params.to_csv(file_name, index = False, sep = " ")
     param_frame.to_csv(CIGALE_parameters['file_store'], mode ='a',index = False)
     return parameter_list
-
-
+def lumin_to_flux(lumins,dist,wave):
+    flambda=lumins* (1. / (4. * cst.pi * dist * dist))
+    return 1e+29 * 1e-9 * flambda * wave * wave / cst.c
 def cigale(params_input_cigale,CIGALE_parameters,warehouse):
     photo, spectro, lines = np.ones(2),np.ones(2),np.ones(2)
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
@@ -237,13 +238,18 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
 
     if "spectro" in CIGALE_parameters["mode"]:
         wavelength,spectrum = SED.wavelength_grid, SED.fnu
+        dist = SED.info["universe.luminosity_distance"]
         L_min =  CIGALE_parameters['wavelength_limits']["min"]
         L_max =CIGALE_parameters['wavelength_limits']["max"]
-        new_spec, new_wave,lines = extract_lines(CIGALE_parameters,
-                                                 wavelength,
-                                                 spectrum,
-                                                 True)
-        lim_wave, lim_spec = limit_spec(new_wave,
+        lumin_lines = np.sum([value for 
+                              key,value in SED.luminosities.items() if 
+                              "lines" in key.lower()],axis = 0)
+        
+        
+        
+        flux_lines = lumin_to_flux(lumin_lines,dist,wavelength)
+        new_spec = spectrum #- flux_lines 
+        lim_wave, lim_spec = limit_spec(wavelength,
                                         new_spec,
                                         L_min,
                                         L_max)
@@ -253,7 +259,8 @@ def cigale(params_input_cigale,CIGALE_parameters,warehouse):
                                   L_min,
                                   L_max)
     if "lines" in CIGALE_parameters["mode"]:
-        lines = lines
+        lines_wave =  CIGALE_parameters["nebular"]["line_waves"]
+        lines = np.array([flux_lines[wavelength == wave] for wave in lines_wave]) #MIGHT NEED INTEGRATION ?!
     elif "lines" not in CIGALE_parameters["mode"]:
         lines = np.ones(2)
     return  photo,np.array(spectro), lines, infos
@@ -530,7 +537,8 @@ def fit(galaxy_obs , CIGALE_parameters, TAMIS_parameters):
                    proposal = TAMIS_parameters['proposal'],
                    n_sample = TAMIS_parameters['n_sample'],
                    alpha = TAMIS_parameters['alpha'],
-                   verbose = TAMIS_parameters['verbose'])
+                   verbose = TAMIS_parameters['verbose'],
+                   recycle =  TAMIS_parameters['recycle'])
     result = Sampler.result(T = TAMIS_parameters['T_max'])
     create_output_files(CIGALE_parameters, result)
     estimates = analyse_results(CIGALE_parameters)
@@ -668,9 +676,9 @@ def galaxy_Jorge(phot,spec,wave,z,ident = None,SNR_photo = 3, SNR_spectro = 3):
                                              random_state=ident + 3))
 
     observed_galaxy  = {"spectroscopy_wavelength":np.array(spec_wavelength),
-                        "spectroscopy_fluxes":np.array(spec_flux), #TO SEE IF BUG SOMEWHERE
+                        "spectroscopy_fluxes":np.array(noised_spec), #TO SEE IF BUG SOMEWHERE
                         "spectroscopy_err" : np.array(spec_err),
-                        "photometry_fluxes" : np.array(photo_flux), #TO SEE IF BUG SOMEWHERE
+                        "photometry_fluxes" : np.array(noised_photo), #TO SEE IF BUG SOMEWHERE
                         "photometry_err" :np.array(photo_err),
                         "bands" : bands,
                         "redshift" : np.array(z)
@@ -718,7 +726,7 @@ def plot_result(CIGALE_parameters,
     if title :
         plt.suptitle(title)
     if savefile:
-        plt.savefig(savefile[:len(savefile)-4] + '_cont.png')
+        plt.savefig(savefile[:len(savefile)-4] + '_cont.pdf')
     to_hist = []
     for param in CIGALE_parameters["module_parameters_discrete"]:
         if len(results[param].unique()) > 1:
@@ -743,10 +751,11 @@ def plot_result(CIGALE_parameters,
         for tick in ax.get_xticklabels():
             tick.set_rotation(45)
         #plt.show()
+    plt.tight_layout()
     if title :
         plt.suptitle(title)
     if savefile:
-        plt.savefig(savefile)
+        plt.savefig(savefile + ".pdf")
 
 def show_values(axs, orient="v", space=.01):
     def _single(ax):
