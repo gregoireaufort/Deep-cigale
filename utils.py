@@ -8,6 +8,7 @@ Created on Mon May 25 13:06:15 2020
 
 
 import numpy as np
+import pandas as pd
 from scipy.interpolate import griddata
 import scipy.stats as stats
 import matplotlib.pyplot as plt
@@ -249,3 +250,7 @@ def initialize_TAMIS(CIGALE_parameters,
         
     }
     return TAMIS_parameters
+def compute_ESS_file(file):
+    result = pd.read_csv(file)
+    weights = result["weights"]
+    return compute_ESS(weights)

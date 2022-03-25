@@ -113,41 +113,61 @@ def compute_const_plot(CIGALE_parameters,galaxy_obs):
                                                                      CIGALE_parameters["mode"])
     return constants
 
+
 def plot_obs(CIGALE_parameters,galaxy_obs):
     f,ax = plt.subplots()
-    n_bins = CIGALE_parameters["n_bins"]
-    targ_covar = SED_statistical_analysis.extract_target(galaxy_obs,CIGALE_parameters)
-    target_photo, target_lines, = targ_covar[0:2]
-    target_spectro, covar_photo = targ_covar[2:4]
-    covar_spectro, covar_lines = targ_covar[4:6]
-    lim_wave,_ = SED_statistical_analysis.limit_spec( galaxy_obs["spectroscopy_wavelength"],
-                                galaxy_obs["spectroscopy_err"],
-                                CIGALE_parameters['wavelength_limits']["min"],
-                                CIGALE_parameters['wavelength_limits']["max"])
-    wave_to_plot = np.linspace(start = lim_wave[0],
-                                           stop = lim_wave[-1],
-                                           num = n_bins)
     
-    yerr = np.array(np.sqrt(np.diag(covar_spectro)))*1.96
-    ax.errorbar(x=wave_to_plot,y=target_spectro,yerr=yerr, color = "red")
+    wave_to_plot = []
+    err_to_plot=  []
+    flux_to_plot = []
+    if 'spectro' in CIGALE_parameters["mode"]:
+        
+        wave,y_spec,err = limit_spec(galaxy_obs["spectroscopy_wavelength"],
+                                  galaxy_obs["spectroscopy_fluxes"],
+                                  CIGALE_parameters["wavelength_limits"]["min"],
+                                  CIGALE_parameters["wavelength_limits"]["max"],
+                                  galaxy_obs["spectroscopy_err"])
+        yerr_spec = np.array(err)*1.96
+        
+        wave_to_plot = wave_to_plot + list(wave)
+        err_to_plot = err_to_plot+list(yerr_spec)
+        flux_to_plot = flux_to_plot+list(y_spec)
+    if "photo" in CIGALE_parameters["mode"]:
+        with pcigale.data.SimpleDatabase("filters") as db:
+            wave = [db.get(name=fltr).pivot for fltr in CIGALE_parameters["bands"]]
+            wave_to_plot = wave_to_plot + list(wave)
+            
+        flux_to_plot = flux_to_plot +list(galaxy_obs["photometry_fluxes"])
+        yerr_photo = np.array(galaxy_obs["photometry_err"])*1.96
+        err_to_plot = err_to_plot+list(yerr_photo)
     
+    # ax.errorbar(x=wave_to_plot,y=flux_to_plot,yerr=err_to_plot,
+    #             color = "red")
+    ax.plot(wave_to_plot,flux_to_plot, color = "green")
     return ax,wave_to_plot
 
 def add_sim_plot(ax,
                  wave,
                  params_list,
                  galaxy_obs,
-                 CIGALE_parameters,warehouse,
+                 CIGALE_parameters,
+                 warehouse,
                  color = "blue", 
                  alpha = 1):
     SED = SED_statistical_analysis.cigale(params_list, CIGALE_parameters,warehouse)
+    
     SED_photo = SED[0]
     SED_spectro = SED[1]
     weight_spectro = 1
     constants = compute_const_plot(CIGALE_parameters,galaxy_obs)
     constant = SED_statistical_analysis.compute_constant(SED_photo, SED_spectro,constants,weight_spectro)
-    scaled_spectro = constant*SED_spectro
-    ax.plot(wave,scaled_spectro, color,alpha = alpha)
+    SED_cig = warehouse.get_sed(CIGALE_parameters['module_list'],params_list)
+    scaled_spectro = constant*SED_cig.fnu
+    wave_to_plot,SED_to_plot = limit_spec(SED_cig.wavelength_grid,
+                              scaled_spectro,
+                              np.min(wave)+10,
+                              np.max(wave)-10)
+    ax.plot(wave_to_plot,SED_to_plot, color,alpha = alpha)
     
     return ax
 
@@ -160,6 +180,8 @@ def plot_best_SED(CIGALE_parameters,galaxy_obs):
     warehouse = SedWarehouse()
     ax,wave = plot_obs(CIGALE_parameters,galaxy_obs)
     add_sim_plot(ax,wave,parameter_list,galaxy_obs,CIGALE_parameters,warehouse)
+    #ax.set_yscale('log')
+    #ax.set_xscale('log')
     plt.show()
     
     return None
@@ -187,10 +209,12 @@ def plot_posterior_predictive(CIGALE_parameters,galaxy_obs,n,title = None):
                  color = "blue", 
                  alpha =  results_read["weights"].iloc[idx]/np.sum(results_read["weights"].iloc[idxs]))
       
-    
+    ax.set_yscale('log')
+    ax.set_xscale('log')
     if title :
         plt.suptitle(title)
         plt.savefig(title)
+    
     plt.show()
     
 # plot_best_SED(CIGALE_parameters,galaxy_obs)

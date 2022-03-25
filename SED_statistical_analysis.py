@@ -26,11 +26,15 @@ import multiprocessing as mp
 from functools import partial
 from statsmodels.stats.weightstats import DescrStatsW 
 
-def limit_spec(wavelength,spectrum,L_min,L_max):
+def limit_spec(wavelength,spectrum,L_min,L_max,error = None):
     """extracts spectrum and associated errors between L_min and L_max
     """
     mask = (wavelength >= L_min) & (wavelength<=L_max)
-    return wavelength[mask], spectrum[mask]
+    if error is not None:
+        return wavelength[mask], spectrum[mask],error[mask]
+    else:
+        return wavelength[mask], spectrum[mask]
+    
 
 def rescale(sample,minimum,maximum):
     return sample*(maximum-minimum) + minimum
@@ -700,9 +704,10 @@ def line_drawer(x=None,y=None, hue = None, line_dict = None, line_color = 'r',**
     return ax
 
 def plot_result(CIGALE_parameters,
-                line_dict_fit = None,
+                line_dict_fit_cont = None,
                 title = None,
-                savefile = None):
+                savefile = None,
+                line_dict_disc = None):
     ### MANQUE line_drawer...
     
     
@@ -713,16 +718,16 @@ def plot_result(CIGALE_parameters,
         g = sns.PairGrid(to_plot, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 5)
         g.map_diag(sns.kdeplot,fill = False, weights =results["weights"],levels = 5)
-        g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
+        g.map_diag(line_drawer, line_dict = line_dict_fit_cont, line_color = 'r')
         g.fig.suptitle(title)
     except :
         to_plot2 = to_plot.sample(100)
         g = sns.PairGrid(to_plot2, corner =True,diag_sharey=False)
         g.map_lower(sns.kdeplot, fill = True,weights = results["weights"], levels = 5)
         g.map_diag(sns.kdeplot,fill = False, weights =results["weights"],levels = 5)
-        g.map_diag(line_drawer, line_dict = line_dict_fit, line_color = 'r')
+        g.map_diag(line_drawer, line_dict = line_dict_fit_cont, line_color = 'r')
         g.fig.suptitle(title)
-    
+        print("Warning, low ESS likely, subsampling to plot")
     if title :
         plt.suptitle(title)
     if savefile:
@@ -742,9 +747,20 @@ def plot_result(CIGALE_parameters,
         #plt.figure()
         weights = [np.sum(results["weights"][to_plot_hist[column]==i]) for
                    i in np.unique(to_plot_hist[column])]
+        colors = ['grey']*len(weights)
+        for j in range(len(weights)):
+            if (weights[j] == max(weights)) and (line_dict_disc[column] ==np.unique(to_plot_hist[column])[j]):
+                colors[j] = 'green' 
+            elif (weights[j] < max(weights)) and (line_dict_disc[column] ==np.unique(to_plot_hist[column])[j]):
+                idx_true = np.where(np.unique(to_plot_hist[column])==line_dict_disc[column])
+                colors[idx_true[0][0]] = "blue"
+            elif (weights[j] == max(weights)) and (line_dict_disc[column] !=np.unique(to_plot_hist[column])[j]):
+                colors[j] = 'red'
+        
         ax=sns.barplot(x=np.unique(to_plot_hist[column]), 
                      y =weights, 
-                     ax = axes[i//n_cols,i%n_cols])
+                     ax = axes[i//n_cols,i%n_cols],
+                     palette = colors)
         ax.set(xlabel=column)
         ax.set(ylim = (0,1))
         show_values(ax)
@@ -755,7 +771,7 @@ def plot_result(CIGALE_parameters,
     if title :
         plt.suptitle(title)
     if savefile:
-        plt.savefig(savefile + ".pdf")
+        plt.savefig(savefile)
 
 def show_values(axs, orient="v", space=.01):
     def _single(ax):
