@@ -107,15 +107,24 @@ def fit(ident,CIGALE_parameters,mode,failed):
                                       SNR_spectro = 2)
         
     galaxy_targ = B[ident]
-
-
+    if mode == ["photo"]:
+        title = "photo"
+    elif mode == ["spectro"]:
+        title = "spectro"
+    else: 
+        title = "photo+spectro"
     fit_jorge = {"tau_main" : galaxy_targ["best.sfh.tau_main"],
                     'age_main':galaxy_targ["best.sfh.age_main"],
                       'tau_burst':galaxy_targ["best.sfh.tau_burst"],
                       'f_burst':galaxy_targ["best.sfh.f_burst"],
                       'age_burst':galaxy_targ["best.sfh.age_burst"],
                       'E_BV_lines':galaxy_targ["best.attenuation.E_BV_lines"]}
-    file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+ ".csv"
+    fit_disc = {"metallicity" : galaxy_targ["best.stellar.metallicity"],
+                    "qpah":galaxy_targ["best.dust.qpah"],
+                    "logU" : galaxy_targ["best.nebular.logU"],
+                    "zgas" : galaxy_targ["best.nebular.zgas"],
+                    "umin" : galaxy_targ["best.dust.umin"]}
+    file_store = 'test_Jorge/complete2/'+str(ident)+"_"+title+ ".csv"
     wavelength_lines =[10]#[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
     nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
     
@@ -127,16 +136,18 @@ def fit(ident,CIGALE_parameters,mode,failed):
     CIGALE_parameters["file_store"] = file_store
     CIGALE_parameters["mode"] = mode
     TAMIS_parameters = initialize_TAMIS(CIGALE_parameters, n_comp=4, alpha=100,
-                                        T_max=30, recycle =True)
+                                        T_max=40, recycle =True)
     result = SED_statistical_analysis.fit(galaxy_obs,
                                                  CIGALE_parameters,
                                                  TAMIS_parameters)
     
     try:
         SED_statistical_analysis.plot_result(CIGALE_parameters,
-                                             title = str(ident)+"_"+str(mode),
-                                             line_dict_fit = fit_jorge ,
-                                             savefile = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+".pdf")
+                                                  title = str(ident)+"_"+title,
+                                                  line_dict_fit_cont = fit_jorge ,
+                                                  line_dict_disc = fit_disc,
+                                                  savefile = 'test_Jorge/complete2/'+str(ident)+"_"+title+".pdf")
+
     except:
         failed.append(CIGALE_parameters)
     return result, CIGALE_parameters
@@ -145,9 +156,11 @@ failed_plots = []
 results = []
 np.random.seed(42)
 
-for ident in range(10):
+for ident in range(20):
     for mode in [["photo"],["spectro"],["spectro","photo"]]:
-        results.append(fit(ident, CIGALE_parameters,mode, failed_plots))
+        ft = fit(ident, CIGALE_parameters,mode, failed_plots)
+        if mode ==["spectro","photo"]:
+            results.append(ft[0])
 
 
 ESS = []    
@@ -155,7 +168,7 @@ ESS_relatif = []
 N=[]
 for ident in range(10):
     for mode in [["photo"],["spectro"],["spectro","photo"]]:
-        file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+ ".csv"
+        file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode[0])+ ".csv"
         n_sim = pd.read_csv(file_store).shape[0]
         ESS_run = compute_ESS_file(file_store)
         ESS.append(compute_ESS_file(file_store))
@@ -168,42 +181,42 @@ ESS[2::3]
 #failed_plots
 
 
-plot_best_SED(CIGALE_parameters,galaxy_obs)
-for ident in range(10):
-    for mode in [["photo"],["spectro"],["spectro","photo"]]:
-        galaxy_obs =SED_statistical_analysis.galaxy_Jorge(photo_flux,
-                                      spec_flux,
-                                      spec_wavelength, 
-                                      z,
-                                      ident, 
-                                      SNR_photo=5,
-                                      SNR_spectro = 2)
-        galaxy_targ = B[ident]
+# plot_best_SED(CIGALE_parameters,galaxy_obs)
+# for ident in range(10):
+#     for mode in [["photo"],["spectro"],["spectro","photo"]]:
+#         galaxy_obs =SED_statistical_analysis.galaxy_Jorge(photo_flux,
+#                                       spec_flux,
+#                                       spec_wavelength, 
+#                                       z,
+#                                       ident, 
+#                                       SNR_photo=5,
+#                                       SNR_spectro = 2)
+#         galaxy_targ = B[ident]
         
-        fit_jorge = {"tau_main" : galaxy_targ["best.sfh.tau_main"],
-                        'age_main':galaxy_targ["best.sfh.age_main"],
-                          'tau_burst':galaxy_targ["best.sfh.tau_burst"],
-                          'f_burst':galaxy_targ["best.sfh.f_burst"],
-                          'age_burst':galaxy_targ["best.sfh.age_burst"],
-                          'E_BV_lines':galaxy_targ["best.attenuation.E_BV_lines"]}
-        fit_disc = {"metallicity" : galaxy_targ["best.stellar.metallicity"],
-                    "qpah":galaxy_targ["best.dust.qpah"],
-                    "logU" : galaxy_targ["best.nebular.logU"],
-                    "zgas" : galaxy_targ["best.nebular.zgas"],
-                    "umin" : galaxy_targ["best.dust.umin"]}
-        file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+ ".csv"
-        wavelength_lines =[10]#[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
-        nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
+#         fit_jorge = {"tau_main" : galaxy_targ["best.sfh.tau_main"],
+#                         'age_main':galaxy_targ["best.sfh.age_main"],
+#                           'tau_burst':galaxy_targ["best.sfh.tau_burst"],
+#                           'f_burst':galaxy_targ["best.sfh.f_burst"],
+#                           'age_burst':galaxy_targ["best.sfh.age_burst"],
+#                           'E_BV_lines':galaxy_targ["best.attenuation.E_BV_lines"]}
+#         fit_disc = {"metallicity" : galaxy_targ["best.stellar.metallicity"],
+#                     "qpah":galaxy_targ["best.dust.qpah"],
+#                     "logU" : galaxy_targ["best.nebular.logU"],
+#                     "zgas" : galaxy_targ["best.nebular.zgas"],
+#                     "umin" : galaxy_targ["best.dust.umin"]}
+#         file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode[0])+ ".csv"
+#         wavelength_lines =[10]#[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
+#         nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
         
-        CIGALE_parameters["module_parameters_discrete"]["redshift"] = [galaxy_obs["redshift"]]
-        CIGALE_parameters["wavelength_limits"] = {"min" : 600,
-                                                    "max" : 1800}
-        CIGALE_parameters["bands"] =galaxy_obs["bands"]
-        CIGALE_parameters["nebular"] = nebular_params 
-        CIGALE_parameters["file_store"] = file_store
-        CIGALE_parameters["mode"] = mode
-        plot_posterior_predictive(CIGALE_parameters,galaxy_obs,500,
-                          title = 'test_Jorge/complete/'+str(ident)+"_"+str(mode)+"_post_pred.pdf")
+#         CIGALE_parameters["module_parameters_discrete"]["redshift"] = [galaxy_obs["redshift"]]
+#         CIGALE_parameters["wavelength_limits"] = {"min" : 600,
+#                                                     "max" : 1800}
+#         CIGALE_parameters["bands"] =galaxy_obs["bands"]
+#         CIGALE_parameters["nebular"] = nebular_params 
+#         CIGALE_parameters["file_store"] = file_store
+#         CIGALE_parameters["mode"] = mode
+#         plot_posterior_predictive(CIGALE_parameters,galaxy_obs,500,
+#                           title = 'test_Jorge/complete/'+str(ident)+"_"+str(mode[0])+"_post_pred.pdf")
 
 #============================REPLOTING discrete =============================#
 # mode = ['photo']
