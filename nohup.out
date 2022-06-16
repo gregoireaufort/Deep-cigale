@@ -1,0 +1,398 @@
+Iteration 0
+ESS =  1.0071212675399774e+00
+Kullback-Leibler divergence =  6.1872696134208125
+perplexity =  2.0554312204322136e-03
+Iteration 1
+ESS =  5.347945488045694e+00
+Kullback-Leibler divergence =  4.08462993748771
+perplexity =  1.6829366081238393e-02
+Iteration 2
+ESS =  1.0089487444432583e+00
+Kullback-Leibler divergence =  6.178115798262604
+perplexity =  2.0743326359437494e-03
+Iteration 3
+ESS =  4.266196022705887e+00
+Kullback-Leibler divergence =  4.260678964061907
+perplexity =  1.4112717128755095e-02
+Iteration 4
+ESS =  1.9973664821998018e+01
+Kullback-Leibler divergence =  2.4662845351782683
+perplexity =  8.489971562678578e-02
+Iteration 5
+ESS =  4.057811055671071e+01
+Kullback-Leibler divergence =  1.8341634723168037
+perplexity =  1.5974707874358832e-01
+Iteration 6
+ESS =  2.853253809376506e+01
+Kullback-Leibler divergence =  1.6806964927778854
+perplexity =  1.8624421310583142e-01
+Iteration 7
+ESS =  4.547758975233537e+01
+Kullback-Leibler divergence =  1.7066268113379834
+perplexity =  1.8147691719790993e-01
+Iteration 8
+ESS =  6.862247194179793e+01
+Kullback-Leibler divergence =  1.248307858201139
+perplexity =  2.869900140148671e-01
+Iteration 9
+ESS =  6.986481262485593e+01
+Kullback-Leibler divergence =  1.3214891389579577
+perplexity =  2.667377964245977e-01
+Iteration 10
+ESS =  5.922596955048188e+01
+Kullback-Leibler divergence =  1.3674262300699684
+perplexity =  2.5476181476614135e-01
+Iteration 11
+ESS =  6.455933012698935e+01
+Kullback-Leibler divergence =  1.3954621950420307
+perplexity =  2.4771851563406455e-01
+Iteration 12
+ESS =  9.715561913365505e+01
+Kullback-Leibler divergence =  1.1142758808455175
+perplexity =  3.2815281462579243e-01
+Iteration 13
+ESS =  3.9199987397636086e+01
+Kullback-Leibler divergence =  1.5678818457125177
+perplexity =  2.0848632118713856e-01
+Iteration 14
+ESS =  6.81665774507064e+01
+Kullback-Leibler divergence =  1.3485956116226694
+perplexity =  2.596045904252517e-01
+Arreté apres étape 15
+final_step
+1100.3698222637177 pour les  15 iterations
+0.0007920265197753906 pour la première partie
+1.4648408889770508 pour la dernière étape
+1101.8349161148071 secondes au total
+Iteration 0
+ESS =  1.0000000533041227e+00
+Kullback-Leibler divergence =  6.214607606947551
+perplexity =  2.000000982949523e-03
+Iteration 1
+ESS =  1.925715475506679e+00
+Kullback-Leibler divergence =  5.540167177249409
+perplexity =  3.9258704672157484e-03
+Iteration 2
+ESS =  1.9394566481248912e+00
+Kullback-Leibler divergence =  5.53715109707649
+perplexity =  3.937729081569625e-03
+Iteration 3
+ESS =  1.387633228514748e+00
+Kullback-Leibler divergence =  5.6453782988253
+perplexity =  3.5338113115579166e-03
+Iteration 4
+ESS =  5.544069783705488e+00
+Kullback-Leibler divergence =  3.9818981424449724
+perplexity =  1.8650204972969257e-02
+Iteration 5
+ESS =  2.573307708554057e+00
+Kullback-Leibler divergence =  4.824298067671672
+perplexity =  8.032189945882232e-03
+Iteration 6
+ESS =  9.65716148969636e+00
+Kullback-Leibler divergence =  3.201441688038895
+perplexity =  4.070347993749656e-02
+Iteration 7
+ESS =  4.182783781288383e+00
+Kullback-Leibler divergence =  3.5937417666971
+perplexity =  2.7495256868432856e-02
+Iteration 8
+ESS =  4.3939472613351365e+00
+Kullback-Leibler divergence =  3.6852318271168065
+perplexity =  2.509135719211475e-02
+Iteration 9
+ESS =  1.2739903102827828e+01
+Kullback-Leibler divergence =  2.663548873657146
+perplexity =  6.97004243041198e-02
+Iteration 10
+ESS =  2.383108262084358e+01
+Kullback-Leibler divergence =  2.2076896060169737
+perplexity =  1.0995439324605259e-01
+Iteration 11
+ESS =  1.314910324903698e+00
+Kullback-Leibler divergence =  5.2988873572804875
+perplexity =  4.997150858407033e-03
+Iteration 12
+ESS =  1.9655389332086521e+00
+Kullback-Leibler divergence =  4.735686828933185
+perplexity =  8.77641886281465e-03
+Iteration 13
+ESS =  1.4360724213653608e+00
+Kullback-Leibler divergence =  5.1734790481296065
+perplexity =  5.664826293213811e-03
+Iteration 14
+ESS =  2.2728117853679994e+00
+Kullback-Leibler divergence =  4.658377105050761
+perplexity =  9.481837948803414e-03
+Iteration 15
+ESS =  8.009403261145433e+00
+Kullback-Leibler divergence =  3.457333169873978
+perplexity =  3.1513691717955435e-02
+Iteration 16
+ESS =  1.3542215531550262e+01
+Kullback-Leibler divergence =  2.684643995863821
+perplexity =  6.824548534721e-02
+Iteration 17
+ESS =  2.5924536987954454e+01
+Kullback-Leibler divergence =  2.2539985045800486
+perplexity =  1.049786267212938e-01
+Iteration 18
+ESS =  9.331997736514797e+00
+Kullback-Leibler divergence =  2.5968142425964826
+perplexity =  7.45105731197137e-02
+Iteration 19
+ESS =  2.2357703950675116e+01
+Kullback-Leibler divergence =  2.3610560800755067
+perplexity =  9.432056051500864e-02
+Iteration 20
+ESS =  3.8774953741075194e+01
+Kullback-Leibler divergence =  1.85495198645871
+perplexity =  1.564604547151161e-01
+Iteration 21
+ESS =  3.0743564610566583e+01
+Kullback-Leibler divergence =  1.8394479651407512
+perplexity =  1.5890512306605e-01
+Iteration 22
+ESS =  1.1942259790533247e+00
+Kullback-Leibler divergence =  5.563947984097344
+perplexity =  3.8336114447922952e-03
+Iteration 23
+ESS =  6.3654606580256345e+00
+Kullback-Leibler divergence =  3.564265259000445
+perplexity =  2.8317784079440557e-02
+Iteration 24
+ESS =  1.4934105278675947e+01
+Kullback-Leibler divergence =  2.6565139514556444
+perplexity =  7.019249015965151e-02
+Iteration 25
+ESS =  4.0992080596252215e+01
+Kullback-Leibler divergence =  1.8853977650867773
+perplexity =  1.5176867913981298e-01
+Iteration 26
+ESS =  5.503217758094646e+00
+Kullback-Leibler divergence =  3.5696882310462468
+perplexity =  2.8164633169859052e-02
+Iteration 27
+ESS =  9.922168283460952e+00
+Kullback-Leibler divergence =  3.200769130287158
+perplexity =  4.073086458629786e-02
+Iteration 28
+ESS =  1.0232475124938512e+01
+Kullback-Leibler divergence =  2.96262180227325
+perplexity =  5.168323615999968e-02
+Iteration 29
+ESS =  7.46193549867129e+00
+Kullback-Leibler divergence =  2.9793022837238787
+perplexity =  5.082828521785116e-02
+Iteration 30
+ESS =  8.502802049408361e+00
+Kullback-Leibler divergence =  2.831932564122148
+perplexity =  5.8898917675468475e-02
+Iteration 31
+ESS =  1.8243608918856995e+00
+Kullback-Leibler divergence =  4.571652911678379
+perplexity =  1.034085306681849e-02
+Iteration 32
+ESS =  7.713273261917226e+00
+Kullback-Leibler divergence =  3.233985444554138
+perplexity =  3.940015831440802e-02
+Iteration 33
+ESS =  1.208941129197275e+01
+Kullback-Leibler divergence =  2.68929136710721
+perplexity =  6.792905908578617e-02
+Iteration 34
+ESS =  9.186721657532873e+00
+Kullback-Leibler divergence =  3.0599628060330053
+perplexity =  4.688943919180936e-02
+Iteration 35
+ESS =  2.875478688796526e+01
+Kullback-Leibler divergence =  2.2819617093657025
+perplexity =  1.0208375151097059e-01
+Iteration 36
+ESS =  2.148543156987677e+00
+Kullback-Leibler divergence =  4.30610794237183
+perplexity =  1.3485935622007356e-02
+Iteration 37
+ESS =  7.4835730719678235e+00
+Kullback-Leibler divergence =  3.370109002010018
+perplexity =  3.4385889008170224e-02
+Iteration 38
+ESS =  1.4954064794381633e+01
+Kullback-Leibler divergence =  2.63329487239306
+perplexity =  7.18413637225778e-02
+Iteration 39
+ESS =  1.696985922901263e+01
+Kullback-Leibler divergence =  2.429358229966069
+perplexity =  8.809335011709636e-02
+Arreté apres étape 40
+final_step
+1688.9890069961548 pour les  40 iterations
+0.002125263214111328 pour la première partie
+10.613770723342896 pour la dernière étape
+1699.6033720970154 secondes au total
+Iteration 0
+ESS =  1.000000380951175e+00
+Kullback-Leibler divergence =  6.214604960577123
+perplexity =  2.000006275699983e-03
+Iteration 1
+ESS =  1.0067815531841469e+00
+Kullback-Leibler divergence =  6.1920041851557155
+perplexity =  2.045722635005759e-03
+Iteration 2
+ESS =  1.536069076200047e+00
+Kullback-Leibler divergence =  5.663248656649043
+perplexity =  3.471221753492241e-03
+Iteration 3
+ESS =  2.0759010881352444e+00
+Kullback-Leibler divergence =  5.388082082005694
+perplexity =  4.5707312222547265e-03
+Iteration 4
+ESS =  1.0000126281328032e+00
+Kullback-Leibler divergence =  6.2145261881469676
+perplexity =  2.0001638272599234e-03
+Iteration 5
+ESS =  3.2873495287875185e+00
+Kullback-Leibler divergence =  4.597047692890913
+perplexity =  1.0081555700393286e-02
+Iteration 6
+ESS =  1.0876265154015539e+00
+Kullback-Leibler divergence =  5.9637242581750565
+perplexity =  2.5703215834010197e-03
+Iteration 7
+ESS =  3.286455210412268e+00
+Kullback-Leibler divergence =  4.3964114071577125
+perplexity =  1.2321477425598736e-02
+Iteration 8
+ESS =  4.989526267484145e+00
+Kullback-Leibler divergence =  3.9469126501120684
+perplexity =  1.931423963656828e-02
+Iteration 9
+ESS =  7.474249699573821e+00
+Kullback-Leibler divergence =  3.6907249559295723
+perplexity =  2.4953905001893265e-02
+Iteration 10
+ESS =  3.9557974937348206e+00
+Kullback-Leibler divergence =  4.233314337835133
+perplexity =  1.4504238849406999e-02
+Iteration 11
+ESS =  1.936653534754193e+01
+Kullback-Leibler divergence =  2.5694547269932855
+perplexity =  7.657728957082927e-02
+Iteration 12
+ESS =  2.0509992971352142e+00
+Kullback-Leibler divergence =  4.437931853896849
+perplexity =  1.1820359488395254e-02
+Iteration 13
+ESS =  1.162720523869819e+00
+Kullback-Leibler divergence =  5.7365217257875845
+perplexity =  3.2259695902270226e-03
+Iteration 14
+ESS =  2.6974817256915347e+00
+Kullback-Leibler divergence =  4.57079087573458
+perplexity =  1.0349771097130724e-02
+Iteration 15
+ESS =  5.04421433340876e+00
+Kullback-Leibler divergence =  3.5912085089832013
+perplexity =  2.756499773849275e-02
+Iteration 16
+ESS =  6.791970945146944e+00
+Kullback-Leibler divergence =  3.1378330684820144
+perplexity =  4.337669045355084e-02
+Iteration 17
+ESS =  4.148014515464412e+00
+Kullback-Leibler divergence =  3.735366558429649
+perplexity =  2.3864421760313663e-02
+Iteration 18
+ESS =  2.967185706643204e+01
+Kullback-Leibler divergence =  2.2893979715287824
+perplexity =  1.0132744550220327e-01
+Iteration 19
+ESS =  3.2292640689572146e+01
+Kullback-Leibler divergence =  2.163365940385761
+perplexity =  1.1493759611443681e-01
+Iteration 20
+ESS =  1.0934994716057393e+01
+Kullback-Leibler divergence =  2.8692046656894954
+perplexity =  5.674403911892169e-02
+Iteration 21
+ESS =  1.4828840833353787e+01
+Kullback-Leibler divergence =  2.4595483864711993
+perplexity =  8.547354326075544e-02
+Iteration 22
+ESS =  4.692830820551401e+00
+Kullback-Leibler divergence =  3.9827845206852186
+perplexity =  1.8633681161360462e-02
+Iteration 23
+ESS =  2.0718988158592055e+01
+Kullback-Leibler divergence =  2.5439288093407386
+perplexity =  7.85571566190155e-02
+Iteration 24
+ESS =  1.9875364092922283e+01
+Kullback-Leibler divergence =  2.418520649605481
+perplexity =  8.90532610387384e-02
+Iteration 25
+ESS =  1.6506849765360734e+01
+Kullback-Leibler divergence =  2.6415914467917543
+perplexity =  7.124779221342208e-02
+Iteration 26
+ESS =  2.473006863405681e+01
+Kullback-Leibler divergence =  2.4316170078661408
+perplexity =  8.789459136515362e-02
+Iteration 27
+ESS =  3.259823866361203e+00
+Kullback-Leibler divergence =  3.696817903056596
+perplexity =  2.4802324433238626e-02
+Iteration 28
+ESS =  1.1176970789121196e+01
+Kullback-Leibler divergence =  2.8651763489339457
+perplexity =  5.697308310361159e-02
+Iteration 29
+ESS =  1.6326391827113824e+01
+Kullback-Leibler divergence =  2.6039751913160925
+perplexity =  7.397891259533501e-02
+Iteration 30
+ESS =  5.859745142920308e+00
+Kullback-Leibler divergence =  3.401582928409348
+perplexity =  3.332048425221345e-02
+Iteration 31
+ESS =  2.6450163890522226e+01
+Kullback-Leibler divergence =  2.2531474946976724
+perplexity =  1.0506800259455364e-01
+Iteration 32
+ESS =  7.78423837399525e+00
+Kullback-Leibler divergence =  3.087660164721828
+perplexity =  4.5608546137681e-02
+Iteration 33
+ESS =  2.5719557817513717e+01
+Kullback-Leibler divergence =  2.190942595324252
+perplexity =  1.1181130611598807e-01
+Iteration 34
+ESS =  1.2693866560711959e+01
+Kullback-Leibler divergence =  2.526806900206947
+perplexity =  7.991378601682557e-02
+Iteration 35
+ESS =  2.2858446917788324e+01
+Kullback-Leibler divergence =  2.4901695367236067
+perplexity =  8.289591148254599e-02
+Iteration 36
+ESS =  6.725957565716321e+00
+Kullback-Leibler divergence =  3.201517409197309
+perplexity =  4.0700397939531924e-02
+Iteration 37
+ESS =  1.627228677024747e+01
+Kullback-Leibler divergence =  2.67105365017933
+perplexity =  6.917929611740489e-02
+Iteration 38
+ESS =  2.0971222475903016e+01
+Kullback-Leibler divergence =  2.6108602645513326
+perplexity =  7.347131180376543e-02
+Iteration 39
+ESS =  1.0771534252612549e+01
+Kullback-Leibler divergence =  2.728422074223007
+perplexity =  6.532228210229073e-02
+Arreté apres étape 40
+final_step
+1897.43341755867 pour les  40 iterations
+0.0021843910217285156 pour la première partie
+10.55367398262024 pour la dernière étape
+1907.9877169132233 secondes au total

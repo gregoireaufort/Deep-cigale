@@ -10,7 +10,6 @@ from  TAMIS import TAMIS
 import seaborn as sns
 from astropy.table import Table
 from astropy.io import fits
-
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
@@ -26,6 +25,15 @@ import multiprocessing as mp
 from functools import partial
 from statsmodels.stats.weightstats import DescrStatsW 
 
+def compute_weight_spectro(CIGALE_parameters):
+    max_log_spec = np.log(CIGALE_parameters['wavelength_limits']["max"]) 
+    min_log_spec = np.log(CIGALE_parameters['wavelength_limits']["min"])
+    range_spectro =max_log_spec-min_log_spec 
+    
+    with pcigale.data.SimpleDatabase("filters") as db:
+        wave = [db.get(name=fltr).pivot for fltr in CIGALE_parameters["bands"]]
+    range_photo =  np.log(np.max(wave)) - np.log(np.min(wave))
+    return range_spectro/range_photo
 def limit_spec(wavelength,spectrum,L_min,L_max,error = None):
     """extracts spectrum and associated errors between L_min and L_max
     """
@@ -224,6 +232,8 @@ def sample_to_cigale_input(sample,
 def lumin_to_flux(lumins,dist,wave):
     flambda=lumins* (1. / (4. * cst.pi * dist * dist))
     return 1e+29 * 1e-9 * flambda * wave * wave / cst.c
+
+
 def cigale(params_input_cigale,CIGALE_parameters,warehouse):
     photo, spectro, lines = np.ones(2),np.ones(2),np.ones(2)
     SED = warehouse.get_sed(CIGALE_parameters['module_list'],params_input_cigale)
@@ -311,6 +321,7 @@ def compute_constant(SED_photo, SED_spectro, pre_computed_factors,weight_spectro
     constant = num/denom
     return constant
 
+
 def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehouse):
     """Computes the scaled SED, to be fed directly to the likelihood function
     Needs to be parallelized
@@ -324,7 +335,7 @@ def compute_scaled_SED(sample,constants,weight_spectro,CIGALE_parameters,warehou
         for deep_module in CIGALE_parameters["deep_modules"]:
             importlib.reload(deep_module)
     
-
+    
     def _compute_scaled_SED(input_cigale):
         SED = cigale(input_cigale,CIGALE_parameters,warehouse)
         SED_photo = SED[0]
@@ -424,7 +435,7 @@ class target_SED(object):
                                                                   self.target_spectro,
                                                                   self.covar_spectro,
                                                                   CIGALE_parameters["mode"])
-        self.weight_spectro = weight_spectro
+        self.weight_spectro = 1 # compute_weight_spectro(CIGALE_parameters)
         self.warehouse = warehouse
         self.CIGALE_parameters = CIGALE_parameters
         
@@ -674,15 +685,16 @@ def galaxy_Jorge(phot,spec,wave,z,ident = None,SNR_photo = 3, SNR_spectro = 3):
                                                loc = 0,
                                                scale = 1/SNR_photo,
                                                random_state=ident))
+    noised_photo[noised_photo<0] = 0
     noised_spec =spec_flux*(1+stats.norm.rvs(size =len(spec_flux),
                                              loc = 0,
                                              scale = 1/SNR_spectro,
                                              random_state=ident + 3))
-
+    noised_spec[noised_spec<0] = 0
     observed_galaxy  = {"spectroscopy_wavelength":np.array(spec_wavelength),
-                        "spectroscopy_fluxes":np.array(noised_spec), #TO SEE IF BUG SOMEWHERE
+                        "spectroscopy_fluxes":np.array(noised_spec), 
                         "spectroscopy_err" : np.array(spec_err),
-                        "photometry_fluxes" : np.array(noised_photo), #TO SEE IF BUG SOMEWHERE
+                        "photometry_fluxes" : np.array(noised_photo),
                         "photometry_err" :np.array(photo_err),
                         "bands" : bands,
                         "redshift" : np.array(z)

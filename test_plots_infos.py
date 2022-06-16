@@ -7,9 +7,6 @@ Created on Thu Feb 17 15:29:15 2022
 """
 
 import SED_statistical_analysis
-from astropy.io import fits
-
-import scipy.stats as stats
 from utils import *
 import pandas as pd
 import pcigale
@@ -113,7 +110,7 @@ def compute_const_plot(CIGALE_parameters,galaxy_obs):
                                                                      CIGALE_parameters["mode"])
     return constants
 
-
+from SED_statistical_analysis import *
 def plot_obs(CIGALE_parameters,galaxy_obs):
     f,ax = plt.subplots()
     
@@ -122,16 +119,30 @@ def plot_obs(CIGALE_parameters,galaxy_obs):
     flux_to_plot = []
     if 'spectro' in CIGALE_parameters["mode"]:
         
-        wave,y_spec,err = limit_spec(galaxy_obs["spectroscopy_wavelength"],
-                                  galaxy_obs["spectroscopy_fluxes"],
-                                  CIGALE_parameters["wavelength_limits"]["min"],
-                                  CIGALE_parameters["wavelength_limits"]["max"],
-                                  galaxy_obs["spectroscopy_err"])
-        yerr_spec = np.array(err)*1.96
+        # wave,y_spec,err = limit_spec(galaxy_obs["spectroscopy_wavelength"],
+        #                           galaxy_obs["spectroscopy_fluxes"],
+        #                           CIGALE_parameters["wavelength_limits"]["min"],
+        #                           CIGALE_parameters["wavelength_limits"]["max"],
+        #                           galaxy_obs["spectroscopy_err"])
+        # yerr_spec = np.array(err)*1.96
+        wave_spectro,target_spectro = lim_target_spectro(galaxy_obs,
+                                                 CIGALE_parameters)
+        target_spectro,wave_spectro,_ = extract_lines(CIGALE_parameters,
+                                                    wave_spectro,
+                                                    target_spectro,
+                                                    False)
+        wave_spectro,target_spectro = binning_flux(wave_spectro,
+                             target_spectro,
+                             CIGALE_parameters['n_bins'],
+                             CIGALE_parameters['wavelength_limits']["min"],
+                             CIGALE_parameters['wavelength_limits']["max"])
         
-        wave_to_plot = wave_to_plot + list(wave)
-        err_to_plot = err_to_plot+list(yerr_spec)
-        flux_to_plot = flux_to_plot+list(y_spec)
+        covar_spectro,covar_lines = compute_covar_spectro(galaxy_obs,
+                                                          CIGALE_parameters)
+        wave_to_plot = wave_to_plot + list(wave_spectro)
+        err_to_plot = err_to_plot+list(np.diag(covar_spectro))
+        flux_to_plot = flux_to_plot+list(target_spectro)
+        ax.plot(wave_to_plot,flux_to_plot, color = "green")
     if "photo" in CIGALE_parameters["mode"]:
         with pcigale.data.SimpleDatabase("filters") as db:
             wave = [db.get(name=fltr).pivot for fltr in CIGALE_parameters["bands"]]
@@ -140,10 +151,11 @@ def plot_obs(CIGALE_parameters,galaxy_obs):
         flux_to_plot = flux_to_plot +list(galaxy_obs["photometry_fluxes"])
         yerr_photo = np.array(galaxy_obs["photometry_err"])*1.96
         err_to_plot = err_to_plot+list(yerr_photo)
+        ax.errorbar(x=list(wave),y=list(galaxy_obs["photometry_fluxes"]),yerr=list(yerr_photo),
+                color = "red", fmt = " ")
+    wave,flux, err = zip(*sorted(zip(wave_to_plot, flux_to_plot,err_to_plot)))
     
-    # ax.errorbar(x=wave_to_plot,y=flux_to_plot,yerr=err_to_plot,
-    #             color = "red")
-    ax.plot(wave_to_plot,flux_to_plot, color = "green")
+    #
     return ax,wave_to_plot
 
 def add_sim_plot(ax,
@@ -179,9 +191,10 @@ def plot_best_SED(CIGALE_parameters,galaxy_obs):
   
     warehouse = SedWarehouse()
     ax,wave = plot_obs(CIGALE_parameters,galaxy_obs)
-    add_sim_plot(ax,wave,parameter_list,galaxy_obs,CIGALE_parameters,warehouse)
-    #ax.set_yscale('log')
-    #ax.set_xscale('log')
+    add_sim_plot(ax,wave,parameter_list,galaxy_obs,CIGALE_parameters,warehouse,
+                 alpha = 0.5)
+    ax.set_yscale('log')
+    ax.set_xscale('log')
     plt.show()
     
     return None
@@ -219,8 +232,7 @@ def plot_posterior_predictive(CIGALE_parameters,galaxy_obs,n,title = None):
     
 # plot_best_SED(CIGALE_parameters,galaxy_obs)
 
-# plot_posterior_predictive(CIGALE_parameters,galaxy_obs,500,
-#                           title = 'test_Jorge/'+str(0)+"_spectro_post_pred.pdf")
+#plot_posterior_predictive(CIGALE_parameters,galaxy_obs,500)
 
 
 # for key,val in param_frame.items():

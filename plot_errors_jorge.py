@@ -85,7 +85,8 @@ error ={}
 error["photo"] = pd.DataFrame()
 error["spectro"] = pd.DataFrame()
 error["photo+spectro"] = pd.DataFrame()
-for ident in range(10):
+for ident in range(20):
+    print(ident)
     for mode in [["photo"],["spectro"],["spectro","photo"]]:
         galaxy_obs =None
         galaxy_targ = B[ident]
@@ -107,7 +108,7 @@ for ident in range(10):
                         "logU" : galaxy_targ["best.nebular.logU"],
                         "zgas" : galaxy_targ["best.nebular.zgas"],
                         "umin" : galaxy_targ["best.dust.umin"]}
-        file_store = '/media/aufort/Nouveau nom/complete/'+str(ident)+"_"+str(mode)+ ".csv"
+        file_store = 'test_Jorge/complete3/'+str(ident)+"_"+title+ ".csv"
         #wavelength_lines =[10]#[121.60000000000001,133.5,139.7, 154.9, 164.0, 166.5, 190.9,232.6, 279.8, 372.7, 379.8, 383.5, 386.9, 388.9, 397.0, 407.0, 410.2, 434.0, 486.1, 495.9, 500.7, 630.0, 654.8,656.3, 658.4, 671.6, 673.1]
         #nebular_params = {"lines_width" : module_parameters_discrete["lines_width"][0],"line_waves" : wavelength_lines}
         
@@ -121,7 +122,7 @@ for ident in range(10):
         res = SED_statistical_analysis.analyse_results(CIGALE_parameters)
         temp = {}
         for parameter in res.keys():
-                   temp[parameter]= [np.abs((res[parameter]["max"] - fit_jorge[parameter]) /fit_jorge[parameter])]
+                   temp[parameter]= [np.abs((res[parameter]["mean"] - fit_jorge[parameter]) /fit_jorge[parameter])]
         error[title] = pd.concat([error[title],pd.DataFrame.from_dict(temp)])
         
         
@@ -135,8 +136,21 @@ cdf = pd.concat([error["photo"],error["spectro"],error["photo+spectro"] ])
 mdf = pd.melt(cdf, id_vars = ["mode"], value_vars = [*res.keys()])
 
 
-
+mdf.to_csv("errors_means.csv")
 import seaborn as sns
 sns.boxplot(x = "variable", y ="value", hue = "mode",data = mdf)
 plt.yscale("log")
 plt.xticks(rotation = 45)
+plt.savefig("errors_spectro_photo_mean_weighted.pdf")
+
+sns.boxplot(x = "mode", y ="value",data = mdf)
+plt.yscale("log")
+plt.xticks(rotation = 45)
+plt.savefig("errors_spectro_photo_mean_weighted2.pdf")
+
+
+sns.boxplot("mode", y ="value", hue = "variable",data = mdf, showfliers= False)
+plt.xticks(rotation = 45)
+plt.legend(bbox_to_anchor = (1.05,1),loc =2, borderaxespad = 0)
+plt.ylabel("relative error")
+plt.savefig("errors_spectro_photo_mean_weighted_3.pdf")

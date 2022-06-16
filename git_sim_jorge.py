@@ -18,7 +18,6 @@ np.random.seed(42)
 folder_path ="/home/aufort/Bureau/Deep-cigale/test_Jorge/"
 
 photo_flux = pd.read_csv("test_Jorge/photo.csv",index_col=[0])
-
 z =  pd.read_csv("test_Jorge/redshift.csv",index_col=[0])
 spec_flux =  pd.read_csv("test_Jorge/spectro.csv",index_col=[0])
 spec_wavelength =  pd.read_csv("test_Jorge/wavelength_spectro.csv",index_col=[0])
@@ -95,8 +94,6 @@ A=astropy.io.fits.open("/home/aufort/Desktop/jorge/results.fits")
 B = A[1].data
 galaxy_targ = B[0]
 
-
-
 def fit(ident,CIGALE_parameters,mode,failed):
     galaxy_obs =SED_statistical_analysis.galaxy_Jorge(photo_flux,
                                       spec_flux,
@@ -156,27 +153,27 @@ failed_plots = []
 results = []
 np.random.seed(42)
 
-for ident in range(20):
-    for mode in [["photo"],["spectro"],["spectro","photo"]]:
+for ident in range(21,50):
+    for mode in [["photo"],["spectro"],["photo","spectro"]]:
         ft = fit(ident, CIGALE_parameters,mode, failed_plots)
-        if mode ==["spectro","photo"]:
-            results.append(ft[0])
+        # if mode ==["spectro","photo"]:
+        #     results.append(ft[0])
 
-
-ESS = []    
-ESS_relatif = []
-N=[]
-for ident in range(10):
-    for mode in [["photo"],["spectro"],["spectro","photo"]]:
-        file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode[0])+ ".csv"
-        n_sim = pd.read_csv(file_store).shape[0]
-        ESS_run = compute_ESS_file(file_store)
-        ESS.append(compute_ESS_file(file_store))
-        ESS_relatif.append(ESS_run/n_sim)
-        N.append(n_sim)
-ESS[::3]
-ESS[1::3]
-ESS[2::3]
+#fit(17,CIGALE_parameters,["spectro","photo"],failed_plots)
+#ESS = []    
+#ESS_relatif = []
+#N=[]
+#for ident in range(10):
+#    for mode in [["photo"],["spectro"],["spectro","photo"]]:
+#        file_store = 'test_Jorge/complete/'+str(ident)+"_"+str(mode[0])+ ".csv"
+#        n_sim = pd.read_csv(file_store).shape[0]
+#        ESS_run = compute_ESS_file(file_store)
+#        ESS.append(compute_ESS_file(file_store))
+#        ESS_relatif.append(ESS_run/n_sim)
+#        N.append(n_sim)
+#ESS[::3]
+#ESS[1::3]
+#ESS[2::3]
 
 #failed_plots
 
